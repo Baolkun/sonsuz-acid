@@ -4,7 +4,7 @@
 // Ayarlar tarayıcıda saklanır.
 
 import { Besteci, PAGE, slideK } from './besteci.js';
-import { Eller, KNOBS } from './eller.js';
+import { Eller, KNOBS, RENKLER } from './eller.js';
 import { renderFormula, MODE_NAMES, mod } from './formula.js';
 import { Ses } from './ses.js';
 import { View } from './view.js';
@@ -75,6 +75,10 @@ function automate() {
     // bölümün kaçıncı sayfası (tekrarında başka hareket); kilitliyken sayfa döndükçe hareketler sırayla değişir
     variant: besteci.locked ? page.no : (page.snap.prev?.run ?? 1) - 1,
   });
+  if (eller.plans.renk !== renk) {
+    renk = eller.plans.renk;
+    showInfo(page);
+  }
   let moved = false;
   for (const id in values) {
     const el = $(id);
@@ -89,6 +93,7 @@ function automate() {
 
 function setOto(on) {
   oto = on;
+  if (!on) renk = null;
   $('oto').setAttribute('aria-pressed', String(on));
   $('oto').textContent = on ? 'Kendi çeviriyor' : 'Kendi çevirsin';
   if (on) eller.start(knobValues());
@@ -145,8 +150,10 @@ function newJourney() {
   compose();
 }
 
+let renk = null; // ellerin bu sayfaya verdiği renk
 function showInfo(page) {
-  $('bilgi').textContent = `${page.key} ${page.mode} · ${bpm} BPM · yolculuk ${page.journey}${page.kalip ? ` · ${page.kalip}` : ''}`;
+  const r = oto && renk ? ` · renk: ${RENKLER[renk].ad}` : '';
+  $('bilgi').textContent = `${page.key} ${page.mode} · ${bpm} BPM · yolculuk ${page.journey}${page.kalip ? ` · ${page.kalip}` : ''}${r}`;
 }
 
 function showPage(page) {

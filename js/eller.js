@@ -11,7 +11,7 @@
 // Bölümün ilk sayfasında bir hareket, tekrarında öteki gelir. İtişten (son ölçü, yükseliş) sonra yeni sayfanın ilk
 // vuruşunda geri inilir. Yankı cümle sonunda (son iki vuruş) fırlatılır, yeni ölçüde söner. Rastgele olan yalnızca
 // birkaç birimlik sapma ve yankının fırlatılıp fırlatılmadığı.
-// Doku (pompa, oda, hat, hat boyu) her sayfada bir "renk" alır: kuru, derin, parlak, sıkı, geniş. Renk bölümün
+// Doku (pompa, oda, pad, hat, hat boyu) her sayfada bir "renk" alır: kuru, derin, parlak, sıkı, geniş. Renk bölümün
 // enerjisine göre seçilir, art arda iki sayfa aynı renkte olmaz; sayfa başında iki vuruşta yerine oturur. Sayfa içinde:
 // yükselişte pompa derinleşir ve hat uzar, nefeste hat boyu filtreyle birlikte açılıp kapanır, cümle sonunda oda
 // kabarır, kırılmada oda genişler.
@@ -20,18 +20,18 @@
 
 export const KNOBS = {
   filtre: [-100, 100], rezonans: [0, 100], zarf: [0, 100], kuyruk: [0, 100], vurgu: [0, 100], doygunluk: [0, 100], yanki: [0, 100],
-  pompa: [0, 100], oda: [0, 100], hat: [0, 100], hatboyu: [0, 100],
+  pompa: [0, 100], oda: [0, 100], pad: [0, 100], hat: [0, 100], hatboyu: [0, 100],
 };
 // sayfanın rengi: dokunun evden sapması; e: hangi enerjide sık seçilir (0 sakin … 1 dolu)
 export const RENKLER = {
-  kuru: { pompa: -15, oda: -22, hat: 0, hatboyu: -22, e: 0.3 },
-  derin: { pompa: 20, oda: 12, hat: -6, hatboyu: 0, e: 0.6 },
-  parlak: { pompa: 0, oda: 5, hat: 12, hatboyu: 24, e: 0.8 },
-  siki: { pompa: 32, oda: -12, hat: -8, hatboyu: -12, e: 1 },
-  genis: { pompa: -8, oda: 26, hat: 4, hatboyu: 12, e: 0.2 },
+  kuru: { ad: 'kuru', pompa: -15, oda: -22, pad: -18, hat: 0, hatboyu: -22, e: 0.3 },
+  derin: { ad: 'derin', pompa: 20, oda: 12, pad: 12, hat: -6, hatboyu: 0, e: 0.6 },
+  parlak: { ad: 'parlak', pompa: 0, oda: 5, pad: 0, hat: 12, hatboyu: 24, e: 0.8 },
+  siki: { ad: 'sıkı', pompa: 32, oda: -12, pad: -12, hat: -8, hatboyu: -12, e: 1 },
+  genis: { ad: 'geniş', pompa: -8, oda: 26, pad: 20, hat: 4, hatboyu: 12, e: 0.2 },
 };
 // doku kendiliğinden bunların üstüne çıkmaz (kullanıcının evi daha yüksekse ev kalır): oda çok açılınca ses yıkanır
-const CAP = { pompa: 90, oda: 72, hat: 85, hatboyu: 88 };
+const CAP = { pompa: 90, oda: 72, pad: 85, hat: 85, hatboyu: 88 };
 const HAT_LEN_BY_STAGE = [0, -10, -4, 6, 10, 18, 24]; // açık hat yükselişte ve kırılmada uzar
 const HOLD = 8; // vuruş: bırakılan sürgü bu kadar elde kalır
 const ENERGY = [0.1, 0.3, 0.5, 0.7, 0.8, 1, 0.35]; // bölüm bir … altı, kırılma
@@ -145,6 +145,7 @@ export class Eller {
     const R = RENKLER[renk];
     const pompa = -25 + 45 * e + R.pompa + jit(3);
     const oda = 15 * (1 - e) + (quiet ? 20 : 0) + R.oda + jit(3);
+    const pad = (quiet ? 15 : 0) + R.pad + jit(3);
     const hat = -10 + 15 * e + R.hat + jit(3);
     const hatboyu = HAT_LEN_BY_STAGE[stage] + R.hatboyu + jit(4);
     const swell = toss || change || next === null ? 15 : 0; // cümle sonunda oda kabarır
@@ -156,6 +157,7 @@ export class Eller {
       renk,
       pompa: { T: TD, at: cap('pompa', (u) => pompa + (climb ? 15 * rise(u) : 0)) },
       oda: { T: TD, at: cap('oda', (u) => oda + swell * ease((u - 12) / 4)) },
+      pad: { T: TD, at: cap('pad', (u) => pad + (swell / 2) * ease((u - 12) / 4)) },
       hat: { T: TD, at: cap('hat', (u) => hat + enter(u) + (climb ? 10 * rise(u) : 0)) },
       hatboyu: { T: TD, at: cap('hatboyu', (u) => hatboyu + 25 * wah(u) + (kind === 'son' ? 20 * ease((u - 12) / 4) : 0) + (climb ? 20 * rise(u) : 0)) },
       filtre,
