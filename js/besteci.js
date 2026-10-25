@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, TURLER, mod } from './formula.js?v=ae888e31';
+import { MODE_NAMES, TURLER, mod } from './formula.js?v=41d748e7';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey

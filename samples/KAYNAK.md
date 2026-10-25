@@ -1,0 +1,8 @@
+# Davul sesleri
+
+Türlerin davul takımları (js/formula.js, `TURLER` → `ses`). Hepsi tek kanala indirilip tepeleri eşitlenerek çalınır.
+
+- `uzu/` — [tidalcycles/uzu-drumkit](https://github.com/tidalcycles/uzu-drumkit), Unlicense (kamu malı). Sesler Mot4i ve Switch Angel'dan.
+- `808/` — [tidalcycles/sounds-tr808-fischer](https://github.com/tidalcycles/sounds-tr808-fischer), CC0 1.0. Roland TR-808 kayıtları.
+
+`uzu/10_break_amen_pprocessed.wav`: The Winstons'ın "Amen, Brother" (1969) kaydındaki davulun ilk iki ölçüsü, 165 BPM'e işlenmiş. Kaydın hakları plak şirketinde; uzu-drumkit'in lisansı bu kaydı kapsamaz. Kullanıcının isteğiyle eklendi.

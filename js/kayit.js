@@ -4,8 +4,8 @@
 // Adresteki ?kanca=… verilirse en üst satırda o yazı çıkar (tanıtım videoları için).
 // Formül resim olarak değil, görünmez bir kutuda sayfadaki gibi dizdirilip harflerin yerleri okunarak çizilir.
 
-import { View } from './view.js?v=50032cdf';
-import { renderFormula } from './formula.js?v=ae888e31';
+import { View } from './view.js?v=4d73c9af';
+import { renderFormula } from './formula.js?v=41d748e7';
 import { pageName, infoLine } from './dil.js?v=93257a7a';
 
 const W = 540; // mantıksal boyut; piksel çarpanı S ile 1080×1920

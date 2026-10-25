@@ -3,12 +3,12 @@
 // sonraki sayfalar da oradan devam eder. "Kendi çeviriyor" açıkken acid ayarlarını eller çevirir (eller.js).
 // Ayarlar tarayıcıda saklanır.
 
-import { Besteci, PAGE, slideK } from './besteci.js?v=220e1314';
+import { Besteci, PAGE, slideK } from './besteci.js?v=d76e0f22';
 import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js?v=2a4d8fb9';
-import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=ae888e31';
-import { Ses } from './ses.js?v=10485438';
-import { View } from './view.js?v=50032cdf';
-import { Kayit } from './kayit.js?v=4ebb03d9';
+import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=41d748e7';
+import { Ses } from './ses.js?v=017341f9';
+import { View } from './view.js?v=4d73c9af';
+import { Kayit } from './kayit.js?v=d9dfb6b9';
 import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=93257a7a';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider

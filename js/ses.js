@@ -1,4 +1,6 @@
-// Ses: formülü çalan işçiyi (AudioWorklet) kurar, sesi hafif bir sıkıştırıcıdan geçirip hoparlöre verir.
+// Ses: formülü çalan işçiyi (AudioWorklet) kurar, sesi hafif bir sıkıştırıcıdan geçirip hoparlöre verir. Türlerin davul
+// seslerini (samples/) arkada yükleyip tek kanala indirerek işçiye verir; gelene kadar davul sentezlenir.
+import { SES_DOSYALARI } from './formula.js?v=41d748e7';
 
 function squeeze(ctx) {
   const comp = ctx.createDynamicsCompressor();
@@ -12,7 +14,7 @@ function squeeze(ctx) {
 
 export class Ses {
   static async create(ctx) {
-    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=0213a6eb', import.meta.url));
+    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=4958c0e7', import.meta.url));
     return new Ses(ctx);
   }
 
@@ -22,6 +24,26 @@ export class Ses {
     this.out = ctx.createGain();
     this.out.gain.value = 0;
     this.node.connect(this.out).connect(squeeze(ctx)).connect(ctx.destination);
+    for (const name of SES_DOSYALARI()) this.load(name);
+  }
+
+  async load(name) {
+    try {
+      const res = await fetch(new URL(`../samples/${name}.wav`, import.meta.url));
+      const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+      const data = new Float32Array(buf.length);
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        const ch = buf.getChannelData(c);
+        for (let i = 0; i < data.length; i++) data[i] += ch[i] / buf.numberOfChannels;
+      }
+      // tepe 1'e çekilir: türler arasında düzeyi kazançlar belirler
+      let pk = 0;
+      for (const v of data) pk = Math.max(pk, Math.abs(v));
+      if (pk) for (let i = 0; i < data.length; i++) data[i] /= pk;
+      this.node.port.postMessage({ type: 'sample', name, data }, [data.buffer]);
+    } catch {
+      // yüklenemeyen ses: o davul sentezle çalmaya devam eder
+    }
   }
 
   // video kaydı için ayrı kol: ses sürgüsünden bağımsız, varsayılan ses düzeyinde

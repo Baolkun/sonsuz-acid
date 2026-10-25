@@ -149,47 +149,59 @@ export function perkAt(sp, x) {
 // Türler: her biri dört ölçülük bir davul (A) ve metal (Q) kalıbı, on altılık on altılık. A: K kick, S snare, s hayalet
 // snare, C clap, X kick ve crash, B kick ve clap, Z kick ve snare. Q: r ride, h kapalı hat, o açık hat. Sayfa dört ölçü:
 // kalıp sayfaya tam oturur. Amen: The Winstons'ın "Amen, Brother"ındaki davul (1969). kik: türün kick'i (drive
-// doygunluk, decay sönüş, sweep başındaki perde katı ve st onun inişi; gabber'ın kick'i kırpılmış, uzun ve perdeli).
+// doygunluk, decay sönüş, sweep başındaki perde katı ve st onun inişi; gabber'ın kick'i kırpılmış, uzun ve perdeli):
+// sesler yüklenene kadar davul formülden sentezlenir, sonra takımın sesleri çalar.
 // dogra: besteci yarım ölçüleri karıştırır; sert: cümle sonunda ve yükselişte roll (roll: hangi davulla); tempo: seçince
-const AMEN = 'K.K.S..s.sKKS..s' + 'K.K.S..s.sKKS..s' + 'K.K.S..s.sK...S.' + '.sKKS..s.sX...S.';
+// Amen'in ilk iki ölçüsü (ikisi aynı); kayıt da bu iki ölçü, sayfada iki kez döner
+const AMEN = 'K.K.S..s.sKKS..s'.repeat(4);
 const RIDE = 'r.'.repeat(32);
+// Davul sesleri (samples/ klasöründe): uzu: tidalcycles/uzu-drumkit (Unlicense), 808: tidalcycles/sounds-tr808-fischer
+// (CC0). Her türün takımı: K kick, S snare, C clap, h kapalı hat, o açık hat, r ride, X crash; brk varsa Amen kaydı (brk:
+// dosya, bpm: kaydın temposu, n: kaç on altılık), kalıbın her vuruşunda kaydın o on altılığından çalar. bozuk: kick'in
+// kırpılması (gabber kick'i: sıradan bir kick'in sonuna kadar sürülmüş hâli), kg: kick'in düzeyi (kırpılan kick daha dolu)
+const UZU = { K: 'uzu/11_bd_mot4i', S: 'uzu/11_sd_switchangel_3', C: 'uzu/11_cp_mot4i', h: 'uzu/11_hh_mot4i', o: 'uzu/12_oh_switchangel', r: 'uzu/10_rd_switchangel', X: 'uzu/10_cr_switchangel' };
+const REC = { ...UZU, brk: 'uzu/10_break_amen_pprocessed', bpm: 165, n: 32 };
+const SEKIZ = { kg: 0.75, K: '808/bd0050', S: '808/sd0050', C: '808/cp', h: '808/ch', o: '808/oh25', r: '808/cy0000', X: '808/cy0000' };
+const SERT = (bozuk, kg) => ({ ...UZU, K: 'uzu/10_bd_switchangel', S: 'uzu/12_sd_switchangel_2', bozuk, kg });
+// davul seslerinin dosyaları (ses.js yükler)
+export const SES_DOSYALARI = () => [...new Set(Object.values(TURLER).flatMap((T) => Object.entries(T.ses).filter(([k]) => !['bpm', 'n', 'bozuk', 'kg'].includes(k)).map(([, v]) => v)))];
 const KIK = { drive: 1.8, decay: 0.16, sweep: 3, st: 0.012, gain: 1.2 };
 // mathcore: yedi adımlık hücre (kick, snare, hayalet) ve beş adımda bir hat; 7'ye 5 dört ölçü boyunca kayar
 const cell = (n, s, len = 64) => Array.from({ length: len }, (_, i) => s[i % n]).join('');
 export const TURLER = {
-  amen: { ad: 'Amen', A: AMEN, Q: RIDE, kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 0 },
-  jungle: { ad: 'jungle', A: AMEN, Q: RIDE, kik: KIK, roll: 'S', dogra: true, sert: false, tempo: 165 },
-  core: { ad: 'breakcore', A: AMEN, Q: RIDE, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 172 },
+  amen: { ad: 'Amen', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 0 },
+  jungle: { ad: 'jungle', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: true, sert: false, tempo: 165 },
+  core: { ad: 'breakcore', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 172 },
   dnb: {
     ad: 'drum & bass', A: 'K...S.....K.S...' + 'K...S..s..K.S..s' + 'K...S.....KKS...' + 'K...S..s.sK.S.s.',
-    Q: 'h.h.h.o.h.h.h.h.'.repeat(4), kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 174,
+    Q: 'h.h.h.o.h.h.h.h.'.repeat(4), ses: UZU, kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 174,
   },
   footwork: {
     ad: 'footwork', A: 'K..K..K.C.K..K..' + 'K..K..K.C.K..KK.' + 'K..K..K.C.K..K..' + 'K..K..K.C.KKKCCC',
-    Q: 'h..h..h.h..h..h.'.repeat(4), kik: { drive: 1.2, decay: 0.4, sweep: 2, st: 0.02, gain: 0.85 }, roll: 'K', dogra: false, sert: false, tempo: 160,
+    Q: 'h..h..h.h..h..h.'.repeat(4), ses: SEKIZ, kik: { drive: 1.2, decay: 0.4, sweep: 2, st: 0.02, gain: 0.85 }, roll: 'K', dogra: false, sert: false, tempo: 160,
   },
   happy: {
     ad: 'happy hardcore', A: 'X...B...K...B...' + 'K...B...K...B...' + 'K...B...K...B...' + 'K...B...K...B.CC',
-    Q: 'h.o.'.repeat(16), kik: { drive: 4, decay: 0.2, sweep: 4, st: 0.02, gain: 0.9 }, roll: 'S', dogra: false, sert: true, tempo: 175,
+    Q: 'h.o.'.repeat(16), ses: { ...UZU, K: 'uzu/14_bd_switchangel', bozuk: 1.5, kg: 0.6 }, kik: { drive: 4, decay: 0.2, sweep: 4, st: 0.02, gain: 0.9 }, roll: 'S', dogra: false, sert: true, tempo: 175,
   },
   gabber: {
     ad: 'gabber', A: 'X...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K.K.',
-    Q: '..o.'.repeat(16), kik: { drive: 10, decay: 0.32, sweep: 5, st: 0.035, gain: 0.75 }, roll: 'K', dogra: false, sert: true, tempo: 190,
+    Q: '..o.'.repeat(16), ses: SERT(6, 0.6), kik: { drive: 10, decay: 0.32, sweep: 5, st: 0.035, gain: 0.75 }, roll: 'K', dogra: false, sert: true, tempo: 190,
   },
   french: {
     ad: 'frenchcore', A: 'X...K...K...K...' + 'K...Z...K...Z...' + 'K...K...K...K...' + 'K...Z...K..KZ.KK',
-    Q: '..h.'.repeat(16), kik: { drive: 8, decay: 0.28, sweep: 5, st: 0.03, gain: 0.8 }, roll: 'K', dogra: false, sert: true, tempo: 200,
+    Q: '..h.'.repeat(16), ses: SERT(5, 0.6), kik: { drive: 8, decay: 0.28, sweep: 5, st: 0.03, gain: 0.8 }, roll: 'K', dogra: false, sert: true, tempo: 200,
   },
   terror: {
     ad: 'terrorcore', A: 'X..K..K.Z..K..K.' + 'K..K..K.Z..K.KKK' + 'K..K..K.Z..K..K.' + 'K.KK.KK.Z.ZZKKKK',
-    Q: '.h.h'.repeat(16), kik: { drive: 14, decay: 0.18, sweep: 6, st: 0.02, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 200,
+    Q: '.h.h'.repeat(16), ses: SERT(9, 0.45), kik: { drive: 14, decay: 0.18, sweep: 6, st: 0.02, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 200,
   },
   speed: {
     ad: 'speedcore', A: 'X.K.K.K.K.K.K.K.' + 'K.K.Z.K.K.K.Z.K.' + 'K.K.K.K.K.K.K.K.' + 'K.K.Z.K.KKKKKKKK',
-    Q: '.'.repeat(64), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220,
+    Q: '.'.repeat(64), ses: SERT(7, 0.42), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220,
   },
   math: {
-    ad: 'mathcore', A: cell(7, 'K..S.s.'), Q: cell(5, 'h....'), kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
+    ad: 'mathcore', A: cell(7, 'K..S.s.'), Q: cell(5, 'h....'), ses: UZU, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
   },
 };
 export const AMEN_H = { K: 0.5, X: 0.5, B: 0.5, Z: 0.5, S: 0.35, C: 0.35, s: 0.15, r: 0.08 }; // grafikte vuruşun boyu (r: yalnız metal)

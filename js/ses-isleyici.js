@@ -26,9 +26,11 @@
 // inen sinüs (pompayı o da tetikler), türün kick'iyle doyurulur (gabber'da neredeyse kare: uzun, perdeli "bum"); snare
 // iki kısa sinüs ve süzülmüş gürültü (hayalet snare kısık ve kısa), ride hat'in metali alçak bir bantta uzun söner,
 // crash tizde uzun gürültü. Clap ve hat'ler clap ve hat satırının sesiyle çalar. Düzeyleri Kick, Clap ve Hat
-// ayarlarından gelir.
+// ayarlarından gelir. Türün davul sesleri (örnekler) yüklendiyse sentezin yerine onlar çalar: her davulun bir kanalı
+// var, aynı kanalda yeni vuruş eskisini birkaç milisaniyede keser; Amen kaydı kalıbın her vuruşunda kaydın o on
+// altılığından başlar (tempoya göre hızlanır, jungle'daki gibi perdesi de kalkar), sonraki vuruşa kadar akar.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=ae888e31';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=41d748e7';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -71,6 +73,8 @@ const SN_HP = 900; // Hz: snare gürültüsünün altı
 const RIDE_DECAY = 0.45; // s
 const RIDE_HP = 4500; // Hz
 const CRASH_DECAY = 1.1; // s
+const SMP_GAIN = { K: 1.8, S: 1.5, C: 2.2, h: 1.2, o: 1.1, r: 0.9, X: 0.9, B: 2.1 }; // örneklerin düzeyi (tepe 1)
+const SMP_CUT = 0.003; // s: kesilen sesin sönüşü
 const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6, perk: 0.4, brk: 0.35 };
 const ROOM_HP = 250; // Hz: yankıya giden sesin altı kesilir
 const ROOM_DAMP = 5000; // Hz: hatların içinde tizi koyulaştırır
@@ -183,6 +187,10 @@ class FormulSes extends AudioWorkletProcessor {
     this.bkHz = KICK_HZ;
     this.bkVel = 1;
     this.bkK = TURLER.amen.kik;
+    // örnekler: ad → Float32Array; kanallar: K kick, S snare, C clap, M metal, X crash, B Amen kaydı
+    this.smp = {};
+    this.vox = {};
+    this.olds = [];
     this.snAge = 1;
     this.snVel = 1;
     this.snPh = new Float64Array(2);
@@ -243,6 +251,7 @@ class FormulSes extends AudioWorkletProcessor {
     this.eHp = 1 - Math.exp((-TAU * ECHO_HP) / sampleRate);
     this.port.onmessage = ({ data }) => {
       if (data.type === 'clock') this.clocks.push(data);
+      else if (data.type === 'sample') this.smp[data.name] = data.data;
       else if (data.type === 'params') Object.assign(this.prm, data.values);
       else {
         // aynı vuruştan başlayan sayfa yeniden yazıldıysa eskisi ve ardındakiler atılır
@@ -251,6 +260,49 @@ class FormulSes extends AudioWorkletProcessor {
         this.pages.push(data);
       }
     };
+  }
+
+  // vuruşu türün örnekleriyle çalar; takımın sesleri yüklenmediyse false (sentez çalar)
+  sampled(h, bpm) {
+    const S = h.T.ses;
+    const smp = this.smp;
+    if (!S || !(S.brk ? smp[S.brk] : smp[S.K] && smp[S.S])) return false;
+    if (S.brk) {
+      const buf = smp[S.brk];
+      this.play('B', buf, h.vel, bpm / S.bpm, Math.floor(((h.i % S.n) * buf.length) / S.n));
+      return true;
+    }
+    const ch = h.ch;
+    if ('KXBZ'.includes(ch)) this.play('K', smp[S.K], S.kg ?? 1, 1, 0, S.bozuk);
+    if (ch === 'K' && h.vel < 1) this.vox.K.gain *= h.vel; // kick roll
+    if ('SsZ'.includes(ch)) this.play('S', smp[S.S], h.vel, ch === 's' ? 1.06 : 1);
+    if ('CB'.includes(ch)) this.play('C', smp[S.C], 1);
+    if (ch === 'X') this.play('X', smp[S.X], 1);
+    if (h.met) this.play('M', smp[S[h.met]], h.met === 'r' ? (h.i % 4 === 0 ? 1 : 0.6) : h.i % 4 === 2 ? 1 : 0.7, 1, 0, 0, h.met);
+    return true;
+  }
+
+  // kanalda yeni ses; öncekisi kısa bir sönüşle kesilir
+  play(ch, buf, gain, rate = 1, from = 0, drive = 0, kind = ch) {
+    if (!buf) return;
+    const old = this.vox[ch];
+    if (old) this.olds.push(old);
+    this.vox[ch] = { ch, buf, pos: from, rate, gain: gain * SMP_GAIN[kind], drive, cut: 1, end: false };
+  }
+
+  // bir örneğin bu andaki değeri (doğrusal ara değer); kesilen ses söner
+  voice(v, cutStep) {
+    const i = Math.floor(v.pos);
+    if (i + 1 >= v.buf.length || v.cut < 0.001) {
+      v.end = true;
+      return 0;
+    }
+    let y = v.buf[i] + (v.buf[i + 1] - v.buf[i]) * (v.pos - i);
+    v.pos += v.rate;
+    if (v.drive) y = Math.tanh(v.drive * y) / Math.tanh(v.drive);
+    y *= v.gain;
+    if (cutStep) v.cut -= v.cut * cutStep;
+    return y * v.cut;
   }
 
   process(inputs, outputs) {
@@ -398,7 +450,13 @@ class FormulSes extends AudioWorkletProcessor {
         if (bt !== this.bt) {
           this.bt = bt;
           const h = breakAt(sp, x);
-          if (h) {
+          if (h && this.sampled(h, clock.bpm)) {
+            // pompa örnek kick'le de çalışır; sentez kick'i sessiz
+            if ('KXBZ'.includes(h.ch)) {
+              this.bkAge = 0;
+              this.bkVel = 0;
+            }
+          } else if (h) {
             if ('KXBZ'.includes(h.ch)) {
               this.bkAge = 0;
               this.bkPh = 0;
@@ -615,6 +673,27 @@ class FormulSes extends AudioWorkletProcessor {
       }
       this.rdAge += 1 / sr;
       this.crAge += 1 / sr;
+      // örnekler: kick kick'e, snare, clap ve kayıt clap düzeyine, metal hat düzeyine
+      let smpK = 0;
+      for (const ch in this.vox) {
+        const v = this.vox[ch];
+        const y = this.voice(v, 0);
+        if (ch === 'K') smpK += y;
+        else if (ch === 'M' || ch === 'X') ride += y;
+        else brk += y;
+        if (v.end) delete this.vox[ch];
+      }
+      if (this.olds.length) {
+        const cutStep = 1 / (SMP_CUT * sr);
+        for (const v of this.olds) {
+          const y = this.voice(v, cutStep);
+          if (v.ch === 'K') smpK += y;
+          else if (v.ch === 'M' || v.ch === 'X') ride += y;
+          else brk += y;
+        }
+        this.olds = this.olds.filter((v) => !v.end);
+      }
+      bk += smpK;
       // pompa: kick'in vurduğu an kısılır (başı 4 ms'de iner, tık olmasın), sonra geri gelir; kick yoksa düz
       const kA = Math.min(this.kAge, this.bkAge);
       const duck = 1 - now.pump * PUMP_DEPTH * Math.exp(-kA / PUMP_TIME) * (1 - Math.exp(-kA / 0.004));
