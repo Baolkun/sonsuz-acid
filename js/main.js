@@ -3,13 +3,13 @@
 // sonraki sayfalar da oradan devam eder. "Kendi çeviriyor" açıkken acid ayarlarını eller çevirir (eller.js).
 // Ayarlar tarayıcıda saklanır.
 
-import { Besteci, PAGE, slideK } from './besteci.js?v=b99ee1c0';
-import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js?v=7e56b7de';
-import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=c2f8e7f5';
-import { Ses } from './ses.js?v=81aff5d3';
-import { View } from './view.js?v=11031eb6';
-import { Kayit } from './kayit.js?v=b88d942a';
-import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=891f1e18';
+import { Besteci, PAGE, slideK } from './besteci.js?v=94f47592';
+import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js?v=d1dc6594';
+import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=cc1b4452';
+import { Ses } from './ses.js?v=333b6de1';
+import { View } from './view.js?v=1111d727';
+import { Kayit } from './kayit.js?v=7137f7d5';
+import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=6f4b77e2';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
@@ -317,6 +317,7 @@ function soundParams() {
     hatLen: 2 ** ((num('hatboyu') - 50) / 40), // açık hat kuyruğunun çarpanı: 0,42 … 2,4
     perk: num('perk') * 0.004, // 0 … 0,4
     sub: num('sub') * 0.005, // 0 … 0,5
+    shep: num('shep') * 0.006, // 0 … 0,6
   };
 }
 
@@ -397,7 +398,7 @@ $('tempo').addEventListener('input', () => {
   while (clocks.length > 1 && clocks[1].time < ctx.currentTime - 3) clocks.shift();
 });
 $('ses').addEventListener('input', () => ses?.setVolume(volume()));
-for (const id of ['filtre', 'rezonans', 'zarf', 'kuyruk', 'vurgu', 'dalga', 'doygunluk', 'yanki', 'kick', 'hat', 'clap', 'pompa', 'oda', 'pad', 'hatboyu', 'perk', 'sub']) {
+for (const id of ['filtre', 'rezonans', 'zarf', 'kuyruk', 'vurgu', 'dalga', 'doygunluk', 'yanki', 'kick', 'hat', 'clap', 'pompa', 'oda', 'pad', 'hatboyu', 'perk', 'sub', 'shep']) {
   $(id).addEventListener('input', () => ses?.params(soundParams()));
 }
 // eller çevirirken kullanıcı bir sürgüyü tutarsa sürgü onda kalır; bıraktıktan bir süre sonra eller sürdürür

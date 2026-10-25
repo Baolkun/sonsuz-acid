@@ -28,7 +28,7 @@
 export const KNOBS = {
   filtre: [-100, 100], rezonans: [0, 100], zarf: [0, 100], kuyruk: [0, 100], vurgu: [0, 100], doygunluk: [0, 100], yanki: [0, 100],
   pompa: [0, 100], oda: [0, 100], pad: [0, 100], hat: [0, 100], hatboyu: [0, 100], perk: [0, 100],
-  dalga: [0, 100], kayma: [0, 100], sub: [0, 100], glitch: [0, 100],
+  dalga: [0, 100], kayma: [0, 100], sub: [0, 100], glitch: [0, 100], shep: [0, 100],
 };
 // acid sesinin tınısı: dalganın evden sapması (0 testere … 100 kare) ve kaymanın; e: hangi enerjide sık seçilir
 export const TINILAR = {
@@ -48,7 +48,7 @@ export const RENKLER = {
   genis: { ad: 'geniş', kagit: '#93d8e0', pompa: -8, oda: 26, pad: 20, hat: 4, hatboyu: 12, perk: -10, sub: -6, e: 0.2 },
 };
 // doku kendiliğinden bunların üstüne çıkmaz (kullanıcının evi daha yüksekse ev kalır): oda çok açılınca ses yıkanır
-const CAP = { pompa: 90, oda: 72, pad: 85, hat: 85, hatboyu: 88, perk: 85, kayma: 85, sub: 85, glitch: 80 }; // kayma: çok uzun kayınca notalar eriyor
+const CAP = { pompa: 90, oda: 72, pad: 85, hat: 85, hatboyu: 88, perk: 85, kayma: 85, sub: 85, glitch: 80, shep: 85 }; // kayma: çok uzun kayınca notalar eriyor
 const HAT_LEN_BY_STAGE = [0, -10, -4, 6, 10, 18, 24]; // açık hat yükselişte ve kırılmada uzar
 const HOLD = 8; // vuruş: bırakılan sürgü bu kadar elde kalır
 const ENERGY = [0.1, 0.3, 0.5, 0.7, 0.8, 1, 0.35]; // bölüm bir … altı, kırılma
@@ -182,6 +182,7 @@ export class Eller {
     const kayma = Q.kayma + (quiet ? 20 : 0) + jit(3);
     const sub = -14 + 22 * e + R.sub - (quiet ? 25 : 0) + jit(3);
     const glitch = -22 + 32 * e + (stage === 5 ? 15 : 0) + (kind === 'son' ? 8 : 0) - (quiet ? 10 : 0) + jit(4);
+    const shep = jit(3);
     const swell = toss || change || next === null ? 15 : 0; // cümle sonunda oda kabarır
     const enter = kind === 'tirmanis' ? (u) => -15 * (1 - ease(u / 16)) : () => 0; // girişte hat yavaşça gelir
     const TD = reset ?? 2;
@@ -202,6 +203,7 @@ export class Eller {
       // yükselişte sub incelir, drop'ta tepeden yerine iner
       sub: { T: TD, at: on('sub', cap('sub', (u) => sub - (climb ? 30 * rise(u) : 0) + (kind === 'drop' ? 15 * (1 - ease(u / 8)) : 0))) },
       glitch: { T: TD, at: on('glitch', cap('glitch', () => glitch)) },
+      shep: { T: TD, at: on('shep', cap('shep', (u) => shep + (climb ? 15 * rise(u) : 0))) },
       filtre,
       rezonans: { T: reset ?? 4, at: (u) => rez + (climb ? 10 * rise(u) : 0) },
       zarf: { T: reset ?? 4, at: (u) => zarf - 0.4 * A * wah(u) },

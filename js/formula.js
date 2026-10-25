@@ -160,14 +160,24 @@ const RIDE = 'r.'.repeat(32);
 // dosya, bpm: kaydın temposu, n: kaç on altılık), kalıbın her vuruşunda kaydın o on altılığından çalar. bozuk: kick'in
 // kırpılması (gabber kick'i: sıradan bir kick'in sonuna kadar sürülmüş hâli), kg: kick'in düzeyi (kırpılan kick daha dolu)
 const UZU = { K: 'uzu/11_bd_mot4i', S: 'uzu/11_sd_switchangel_3', C: 'uzu/11_cp_mot4i', h: 'uzu/11_hh_mot4i', o: 'uzu/12_oh_switchangel', r: 'uzu/10_rd_switchangel', X: 'uzu/10_cr_switchangel' };
-const REC = { ...UZU, brk: 'uzu/10_break_amen_pprocessed', bpm: 165, n: 32 };
+// Amen kaydının dilimleri: her on altılığın vuruşunun gerçekte başladığı yer (ms, 165 BPM'de). Davulcu ızgaranın 2 … 24 ms
+// gerisinde çalıyor; ızgaradan kesilince her vuruş başka miktarda geç düşüyor, davul acid'den kaçıyordu. Jungle'da
+// break vuruşların başından kesilir (ReCycle), her dilim ızgaraya oturur. Hayalet notalar sezilmezse iki yanındaki
+// vuruşun ortası. Vuruştan 1,5 ms önce: başı kırpılmasın
+const DILIM = [5.2, 102.6, 185.8, 279.5, 373.2, 469.3, 565.4, 632.2, 747.2, 834, 920.7, 1003.2, 1096.5, 1193.7, 1290.8, 1391.3,
+  1476.7, 1563.4, 1650.1, 1739, 1827.8, 1922.5, 2017.1, 2107.4, 2197.6, 2306.3, 2373.2, 2462.1, 2550.9, 2639.2, 2727.5, 2856];
+const REC = { ...UZU, brk: 'uzu/10_break_amen_pprocessed', bpm: 165, n: 32, dilim: DILIM };
 const SEKIZ = { kg: 0.75, K: '808/bd0050', S: '808/sd0050', C: '808/cp', h: '808/ch', o: '808/oh25', r: '808/cy0000', X: '808/cy0000' };
 const SERT = (bozuk, kg) => ({ ...UZU, K: 'uzu/10_bd_switchangel', S: 'uzu/12_sd_switchangel_2', bozuk, kg });
 // davul seslerinin dosyaları (ses.js yükler)
-export const SES_DOSYALARI = () => [...new Set(Object.values(TURLER).flatMap((T) => Object.entries(T.ses).filter(([k]) => !['bpm', 'n', 'bozuk', 'kg'].includes(k)).map(([, v]) => v)))];
+export const SES_DOSYALARI = () => [...new Set(Object.values(TURLER).flatMap((T) => Object.entries(T.ses).filter(([k]) => !['bpm', 'n', 'bozuk', 'kg', 'dilim'].includes(k)).map(([, v]) => v)))];
 const KIK = { drive: 1.8, decay: 0.16, sweep: 3, st: 0.012, gain: 1.2 };
 // mathcore: yedi adımlık hücre (kick, snare, hayalet) ve beş adımda bir hat; 7'ye 5 dört ölçü boyunca kayar
-const cell = (n, s, len = 64) => Array.from({ length: len }, (_, i) => s[i % n]).join('');
+// mathcore: ölçü tek sayılı gruplara bölünür (7 + 5 + 4, 5 + 5 + 6, 3 + 3 + 3 + 3 + 4); her grup vurguyla açılır, her ölçü
+// yeniden kick'le başlar. Döngü ölçüyü aşınca (7'lik hücre dört ölçü boyunca) ölçü başı kayboluyor, ritim kaçıyordu
+const GRUP = { 3: ['K.s', 'h..'], 4: ['K.S.', 'h.h.'], 5: ['K..S.', 'h.h..'], 6: ['K..S.s', 'h..h..'], 7: ['K..S.s.', 'h.h.h..'] };
+const groups = (bars, j) => bars.map((b) => b.map((n) => GRUP[n][j]).join('')).join('');
+const MATH = [[7, 5, 4], [7, 5, 4], [5, 5, 6], [3, 3, 3, 3, 4]];
 export const TURLER = {
   amen: { ad: 'Amen', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 0 },
   jungle: { ad: 'jungle', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: true, sert: false, tempo: 165 },
@@ -201,7 +211,7 @@ export const TURLER = {
     Q: '.'.repeat(64), ses: SERT(7, 0.42), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220,
   },
   math: {
-    ad: 'mathcore', A: cell(7, 'K..S.s.'), Q: cell(5, 'h....'), ses: UZU, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
+    ad: 'mathcore', A: groups(MATH, 0), Q: groups(MATH, 1), ses: UZU, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
   },
 };
 export const AMEN_H = { K: 0.5, X: 0.5, B: 0.5, Z: 0.5, S: 0.35, C: 0.35, s: 0.15, r: 0.08 }; // grafikte vuruşun boyu (r: yalnız metal)
@@ -251,6 +261,19 @@ export function subHz(sp, x) {
   while (f > 82.5) f /= 2;
   while (f < 41.2) f *= 2;
   return f;
+}
+// Shepard tonu: oktav aralıklı sekiz sinüs birlikte kayar, f_k = f₀ · 2^(k + frac p). Her birinin gücü perdesinin çanı
+// (400 Hz'de en güçlü, iki yana sönen); en tizdeki sönerken en pesteki doğar, ses hiç varmadan yükselir. f₀ tonun kökü
+// (27,5 … 55 Hz). Yükselişte p = ((x + 8)/8)²: hızlanarak dört oktav, drop'ta p tam sayı, tonun köküne oturur; ses
+// sayfa boyunca dörtte birden tama açılır. Kırılmada sayfada bir oktav yavaşça iner
+export const SHEP = { K: 8, C: 400, SIG: 1.1 };
+export function shepAt(sp, x) {
+  if (!sp.shep) return null;
+  let f0 = REF_HZ * 2 ** (sp.base / 12);
+  while (f0 >= 55) f0 /= 2;
+  while (f0 < 27.5) f0 *= 2;
+  const u = (x + 8) / 8;
+  return sp.shep > 0 ? { f0, p: u * u, a: 0.25 + 0.375 * u } : { f0, p: -u / 2, a: 0.6 };
 }
 export function drumHz(sp, x, kind, k = 0) {
   const r = rootAt(sp, x);
@@ -438,6 +461,10 @@ export function renderFormula(sp, en = false) {
     const span = (g) => `${X} ∈ [${g.x}, ${g.x + g.d})`;
     const how = (g) => (g.k === 'tekrar' ? ` ${fr('1', 1 / g.L)}` : g.k === 'kir' ? ` ÷${g.n}` : '');
     defs.push(`${V('G')}: ${sp.glitch.map((g) => `${span(g)} ${ad[g.k]}${how(g)}`).join(', ')}`);
+  }
+  if (sp.shep) {
+    const p = sp.shep > 0 ? `(${fr(`${X} + 8`, 8)})²` : `−${fr(`${X} + 8`, 16)}`;
+    defs.push(`${V('Ş')}: ${V('f')}<sub>${V('k')}</sub> = ${V('f')}<sub>0</sub> · 2<sup>${V('k')} + ${FRAC}(${V('p')})</sup>, ${V('p')} = ${p}, ${V('k')} = 0 … ${SHEP.K - 1}, ${en ? 'weight' : 'ağırlık'} ${ex(`−log₂²(${V('f')}<sub>${V('k')}</sub>/${SHEP.C}) / ${(2 * SHEP.SIG * SHEP.SIG).toFixed(1).replace('.', ',')}`)}`);
   }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);
   defs.push(`${V('r')} = (${sp.prog.map((d, i) => N('prog', d, `prog.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 4)}⌋]`);

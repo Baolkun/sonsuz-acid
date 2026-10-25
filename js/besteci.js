@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, TURLER, mod } from './formula.js?v=c2f8e7f5';
+import { MODE_NAMES, TURLER, mod } from './formula.js?v=cc1b4452';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
@@ -80,15 +80,19 @@ export const SARKILAR = {
     prog: [[4, 0, 4, 0], [3, 2, 4, 0]],
   },
 };
-// Doğramalar (breakcore, jungle, mathcore): σ sayfanın sekiz yarım ölçüsünde kalıbın hangi yarım ölçüsü çalar, ρ tekrarın boyu (otuz ikilik;
-// 16 düz). Hepsi ölçü başını kick'le açar, ikinci ve dördüncü vuruşta snare kalır: doğrama oynar ama ritim dağılmaz
+// Doğramalar (breakcore, jungle, mathcore): σ sayfanın sekiz yarım ölçüsünde kalıbın hangi yarım ölçüsü çalar, ρ tekrarın boyu
+// (otuz ikilik; 16 düz). Jungle kurgularındaki gibi ölçüler bütün kalır ya da bütün tekrar eder (ilk ölçü döner, iki ölçü
+// döner, dördüncü ölçü başa döner); her ölçü kick'le açılır, ikinci ve dördüncü vuruşta snare kalır. Snare'in ikilendiği
+// tekrar (ρ 8: ikinci ve dördüncü vuruş art arda) yalnızca ölçünün sonunda, cümle biterken: ölçünün ortasında üçüncü
+// vuruşa snare düşünce ritim yarıya inmiş gibi kayıyordu
 export const DOGRAMALAR = [
-  { sig: [0, 1, 0, 1, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
-  { sig: [0, 1, 2, 3, 0, 1, 6, 7], rho: [16, 16, 16, 8, 16, 16, 16, 16] },
-  { sig: [0, 3, 2, 1, 4, 7, 6, 5], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
-  { sig: [0, 1, 6, 7, 0, 1, 6, 7], rho: [16, 16, 16, 16, 16, 8, 16, 16] },
-  { sig: [0, 0, 2, 2, 4, 5, 6, 6], rho: [16, 8, 16, 8, 16, 16, 16, 8] },
-  { sig: [4, 5, 0, 1, 6, 1, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
+  { sig: [0, 1, 2, 3, 4, 5, 0, 1], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
+  { sig: [0, 1, 2, 3, 0, 1, 2, 3], rho: [16, 16, 16, 16, 16, 16, 16, 8] },
+  { sig: [0, 1, 0, 1, 4, 5, 4, 5], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
+  { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 8] },
+  { sig: [0, 1, 2, 3, 0, 1, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
+  { sig: [0, 1, 2, 3, 4, 5, 6, 3], rho: [16, 16, 16, 16, 16, 16, 16, 8] },
+  { sig: [0, 1, 4, 5, 0, 1, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
 ];
 export const AMEN_DUZ = { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] };
 export const RHO = [16, 8, 4, 2, 1];
@@ -392,6 +396,8 @@ export class Besteci {
       perk: P ? { ses: P.ses, m: P.m, on: P.on.slice(), from: enter('perk') } : null,
       gap: !!s.gap,
       glitch: st.glitch && s.glitch?.length ? clone(s.glitch) : null,
+      // Shepard: yükselişte yükselir, kırılmada iner
+      shep: stage === 5 ? 1 : stage === 6 ? -1 : null,
       pad: f.pad ? { lvl: f.pad } : null,
     };
     // Tür (Amen, gabber …): kick çalacak bölümlerde kick'in, clap'in, hat'in ve ek vurmalının yerine (elle seçilenler

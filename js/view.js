@@ -1,8 +1,8 @@
 // Grafik: TikTok'taki gibi buruşuk limon yeşili kâğıtta formülün satırları: üstte hat ve kick, ortada melodi, altta clap.
 // Her sayfa x = −8'de başlar; kalemler (kırmızı noktalar) ilerledikçe eğriler çizilir, sayfa bitince kâğıt temizlenir.
 
-import { kickY, melodyY, hatY, clapY, padY, perkY, breakY } from './formula.js?v=c2f8e7f5';
-import { t } from './dil.js?v=891f1e18';
+import { kickY, melodyY, hatY, clapY, padY, perkY, breakY } from './formula.js?v=cc1b4452';
+import { t } from './dil.js?v=6f4b77e2';
 
 const X_MIN = -10.5;
 const X_MAX = 11.5;
