@@ -11,12 +11,28 @@
 // Bölümün ilk sayfasında bir hareket, tekrarında öteki gelir. İtişten (son ölçü, yükseliş) sonra yeni sayfanın ilk
 // vuruşunda geri inilir. Yankı cümle sonunda (son iki vuruş) fırlatılır, yeni ölçüde söner. Rastgele olan yalnızca
 // birkaç birimlik sapma ve yankının fırlatılıp fırlatılmadığı.
+// Doku (pompa, oda, hat, hat boyu) her sayfada bir "renk" alır: kuru, derin, parlak, sıkı, geniş. Renk bölümün
+// enerjisine göre seçilir, art arda iki sayfa aynı renkte olmaz; sayfa başında iki vuruşta yerine oturur. Sayfa içinde:
+// yükselişte pompa derinleşir ve hat uzar, nefeste hat boyu filtreyle birlikte açılıp kapanır, cümle sonunda oda
+// kabarır, kırılmada oda genişler.
 // Sürgüler kullanıcının yerleştirdiği yerin ("ev") çevresinde gezinir. Kullanıcı bir sürgüyü tutarsa sürgü
 // bırakıldıktan sonra da bir süre onda kalır, sonra hareket yavaşça geri gelir; yeni ev bırakıldığı yerdir.
 
 export const KNOBS = {
   filtre: [-100, 100], rezonans: [0, 100], zarf: [0, 100], kuyruk: [0, 100], vurgu: [0, 100], doygunluk: [0, 100], yanki: [0, 100],
+  pompa: [0, 100], oda: [0, 100], hat: [0, 100], hatboyu: [0, 100],
 };
+// sayfanın rengi: dokunun evden sapması; e: hangi enerjide sık seçilir (0 sakin … 1 dolu)
+export const RENKLER = {
+  kuru: { pompa: -15, oda: -22, hat: 0, hatboyu: -22, e: 0.3 },
+  derin: { pompa: 20, oda: 12, hat: -6, hatboyu: 0, e: 0.6 },
+  parlak: { pompa: 0, oda: 5, hat: 12, hatboyu: 24, e: 0.8 },
+  siki: { pompa: 32, oda: -12, hat: -8, hatboyu: -12, e: 1 },
+  genis: { pompa: -8, oda: 26, hat: 4, hatboyu: 12, e: 0.2 },
+};
+// doku kendiliğinden bunların üstüne çıkmaz (kullanıcının evi daha yüksekse ev kalır): oda çok açılınca ses yıkanır
+const CAP = { pompa: 90, oda: 72, hat: 85, hatboyu: 88 };
+const HAT_LEN_BY_STAGE = [0, -10, -4, 6, 10, 18, 24]; // açık hat yükselişte ve kırılmada uzar
 const HOLD = 8; // vuruş: bırakılan sürgü bu kadar elde kalır
 const ENERGY = [0.1, 0.3, 0.5, 0.7, 0.8, 1, 0.35]; // bölüm bir … altı, kırılma
 const DECAY_BY_STAGE = [-8, -2, 8, 4, -6, 10, 14]; // kuyruk: dolguda ve yükselişte uzun, hokette kısa
@@ -41,6 +57,16 @@ export class Eller {
     this.page = null; // hareketlerin seçildiği sayfa
     this.plans = null; // o sayfanın eğrileri
     this.last = null; // önceki sayfada filtrenin hareketi
+    this.renk = null; // önceki sayfanın rengi
+  }
+
+  // sayfanın rengi: enerjiye yakın olanlar daha sık, öncekinden başka
+  pickRenk(e) {
+    const ids = Object.keys(RENKLER).filter((id) => id !== this.renk);
+    const w = ids.map((id) => Math.exp(-((RENKLER[id].e - e) ** 2) / 0.08));
+    let x = Math.random() * w.reduce((a, b) => a + b);
+    for (let i = 0; i < ids.length; i++) if ((x -= w[i]) < 0) return ids[i];
+    return ids[ids.length - 1];
   }
 
   // eller işe başlar: sürgülerin şimdiki yerleri ev olur
@@ -54,6 +80,7 @@ export class Eller {
     this.page = null;
     this.plans = null;
     this.last = null;
+    this.renk = null;
   }
 
   // kullanıcı sürgüyü oynattı; down: parmağı hâlâ üstünde
@@ -113,8 +140,24 @@ export class Eller {
     const doy = Math.max(0, 50 * (e - 0.45)) - (quiet ? 30 : 0) + jit(3);
     // yankı cümle sonunda fırlatılır: yolculuk biterken çoğu zaman, bölüm değişirken ya da sekiz ölçülük cümle biterken arada bir
     const toss = Math.random() < (next === null ? 0.75 : change ? 0.4 : variant % 2 ? 0.25 : 0) ? rand(30, 40) : 0;
+    // doku: bölümün tabanı + sayfanın rengi
+    const renk = (this.renk = this.pickRenk(e));
+    const R = RENKLER[renk];
+    const pompa = -25 + 45 * e + R.pompa + jit(3);
+    const oda = 15 * (1 - e) + (quiet ? 20 : 0) + R.oda + jit(3);
+    const hat = -10 + 15 * e + R.hat + jit(3);
+    const hatboyu = HAT_LEN_BY_STAGE[stage] + R.hatboyu + jit(4);
+    const swell = toss || change || next === null ? 15 : 0; // cümle sonunda oda kabarır
+    const enter = kind === 'tirmanis' ? (u) => -15 * (1 - ease(u / 16)) : () => 0; // girişte hat yavaşça gelir
+    const TD = reset ?? 2;
+    const cap = (id, f) => (u) => Math.min(f(u), Math.max(0, CAP[id] - this.home[id]));
     return {
       kind,
+      renk,
+      pompa: { T: TD, at: cap('pompa', (u) => pompa + (climb ? 15 * rise(u) : 0)) },
+      oda: { T: TD, at: cap('oda', (u) => oda + swell * ease((u - 12) / 4)) },
+      hat: { T: TD, at: cap('hat', (u) => hat + enter(u) + (climb ? 10 * rise(u) : 0)) },
+      hatboyu: { T: TD, at: cap('hatboyu', (u) => hatboyu + 25 * wah(u) + (kind === 'son' ? 20 * ease((u - 12) / 4) : 0) + (climb ? 20 * rise(u) : 0)) },
       filtre,
       rezonans: { T: reset ?? 4, at: (u) => rez + (climb ? 10 * rise(u) : 0) },
       zarf: { T: reset ?? 4, at: (u) => zarf - 0.4 * A * wah(u) },

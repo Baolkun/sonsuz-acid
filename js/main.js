@@ -239,6 +239,7 @@ function soundParams() {
     pump: num('pompa') / 100,
     room: num('oda') / 100,
     pad: num('pad') * 0.004, // 0 … 0,4
+    hatLen: 2 ** ((num('hatboyu') - 50) / 40), // açık hat kuyruğunun çarpanı: 0,42 … 2,4
   };
 }
 
@@ -281,7 +282,7 @@ $('tempo').addEventListener('input', () => {
   while (clocks.length > 1 && clocks[1].time < ctx.currentTime - 3) clocks.shift();
 });
 $('ses').addEventListener('input', () => ses?.setVolume(volume()));
-for (const id of ['filtre', 'rezonans', 'zarf', 'kuyruk', 'vurgu', 'dalga', 'doygunluk', 'yanki', 'kick', 'hat', 'clap', 'pompa', 'oda', 'pad']) {
+for (const id of ['filtre', 'rezonans', 'zarf', 'kuyruk', 'vurgu', 'dalga', 'doygunluk', 'yanki', 'kick', 'hat', 'clap', 'pompa', 'oda', 'pad', 'hatboyu']) {
   $(id).addEventListener('input', () => ses?.params(soundParams()));
 }
 // eller çevirirken kullanıcı bir sürgüyü tutarsa sürgü onda kalır; bıraktıktan bir süre sonra eller sürdürür

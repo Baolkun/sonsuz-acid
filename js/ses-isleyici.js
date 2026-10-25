@@ -66,7 +66,7 @@ const CLAP_OCT = 5.2; // clap: ≈ 1,5 kHz
 const CLAP_Q = 0.8; // 1/Q
 const CLAP_GAP = 0.011; // s: ellerin çarpma arası
 const CLAP_TAIL = 0.11; // s
-const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5, room: 0.35, pad: PAD };
+const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5, room: 0.35, pad: PAD, hatLen: 1 };
 const DRIVE_GAIN = 2; // doygunlukta kırpma eşiği (filtre çıkışı 3,5'e kadar çıkıyor)
 const DRIVE_POW = 0.4; // sürüş arttıkça düzey bu üsle geri alınır, açınca ses patlamasın ya da kısılmasın
 const ACC_ENV = 1.2; // oktav: tam vurguda filtre zarfına eklenen
@@ -234,6 +234,7 @@ class FormulSes extends AudioWorkletProcessor {
       now.pump += (prm.pump - now.pump) * sm;
       now.room += (prm.room - now.room) * sm;
       now.pad += (prm.pad - now.pad) * sm;
+      now.hatLen += (prm.hatLen - now.hatLen) * sm;
       if (!page || beat < page.beat || beat >= page.beat + PAGE) page = pageAt(pages, beat);
       let mel = 0;
       let kickOn = false;
@@ -317,7 +318,7 @@ class FormulSes extends AudioWorkletProcessor {
           const h = hatAt(sp, x);
           this.hAge = 0;
           this.hVel = h.vel;
-          this.hDecay = HAT_DECAY[h.open ? 1 : 0];
+          this.hDecay = HAT_DECAY[h.open ? 1 : 0] * (h.open ? now.hatLen : Math.sqrt(now.hatLen));
           this.hG = Math.tan((Math.PI * Math.min(REF_HZ * 2 ** (HAT_Y + 0.3 + HAT_OCT), 0.45 * sr)) / sr);
         }
         this.hOn = yh !== null;
