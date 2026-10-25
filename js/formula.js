@@ -146,28 +146,72 @@ export function perkAt(sp, x) {
   return { ses: p.ses, vel: p.ses === 'shaker' ? SHAKER_V[mod(s, 4)] : 1, k };
 }
 
-// Amen break: The Winstons'ın "Amen, Brother"ındaki dört ölçülük davul, on altılık on altılık (K kick, S snare,
-// s hayalet snare, X kick ve crash, . boş); çift adımlarda ride. Sayfa dört ölçü: Amen sayfaya tam oturur
-export const AMEN = 'K.K.S..s.sKKS..s' + 'K.K.S..s.sKKS..s' + 'K.K.S..s.sK...S.' + '.sKKS..s.sX...S.';
-export const AMEN_H = { K: 0.5, X: 0.5, S: 0.35, s: 0.15, r: 0.08 }; // grafikte vuruşun boyu (r: yalnız ride)
-// Breakcore doğraması: sayfa sekiz yarım ölçü (c); her biri Amen'in σ[c]'inci yarım ölçüsünü çalar. ρ[c] tekrarın boyu
-// (otuz ikilik): 16 düz, 8 yarım ölçünün son yarısı iki kez, 1 son adımı her otuz ikilikte (snare roll).
-// { ch, vel, ride, i } ya da null; otuz ikiliğin başında, kaynakta yeni bir on altılık başlıyorsa
+// Türler: her biri dört ölçülük bir davul (A) ve metal (Q) kalıbı, on altılık on altılık. A: K kick, S snare, s hayalet
+// snare, C clap, X kick ve crash, B kick ve clap, Z kick ve snare. Q: r ride, h kapalı hat, o açık hat. Sayfa dört ölçü:
+// kalıp sayfaya tam oturur. Amen: The Winstons'ın "Amen, Brother"ındaki davul (1969). kik: türün kick'i (drive
+// doygunluk, decay sönüş, sweep başındaki perde katı ve st onun inişi; gabber'ın kick'i kırpılmış, uzun ve perdeli).
+// dogra: besteci yarım ölçüleri karıştırır; sert: cümle sonunda ve yükselişte roll (roll: hangi davulla); tempo: seçince
+const AMEN = 'K.K.S..s.sKKS..s' + 'K.K.S..s.sKKS..s' + 'K.K.S..s.sK...S.' + '.sKKS..s.sX...S.';
+const RIDE = 'r.'.repeat(32);
+const KIK = { drive: 1.8, decay: 0.16, sweep: 3, st: 0.012, gain: 1.2 };
+// mathcore: yedi adımlık hücre (kick, snare, hayalet) ve beş adımda bir hat; 7'ye 5 dört ölçü boyunca kayar
+const cell = (n, s, len = 64) => Array.from({ length: len }, (_, i) => s[i % n]).join('');
+export const TURLER = {
+  amen: { ad: 'Amen', A: AMEN, Q: RIDE, kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 0 },
+  jungle: { ad: 'jungle', A: AMEN, Q: RIDE, kik: KIK, roll: 'S', dogra: true, sert: false, tempo: 165 },
+  core: { ad: 'breakcore', A: AMEN, Q: RIDE, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 172 },
+  dnb: {
+    ad: 'drum & bass', A: 'K...S.....K.S...' + 'K...S..s..K.S..s' + 'K...S.....KKS...' + 'K...S..s.sK.S.s.',
+    Q: 'h.h.h.o.h.h.h.h.'.repeat(4), kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 174,
+  },
+  footwork: {
+    ad: 'footwork', A: 'K..K..K.C.K..K..' + 'K..K..K.C.K..KK.' + 'K..K..K.C.K..K..' + 'K..K..K.C.KKKCCC',
+    Q: 'h..h..h.h..h..h.'.repeat(4), kik: { drive: 1.2, decay: 0.4, sweep: 2, st: 0.02, gain: 0.85 }, roll: 'K', dogra: false, sert: false, tempo: 160,
+  },
+  happy: {
+    ad: 'happy hardcore', A: 'X...B...K...B...' + 'K...B...K...B...' + 'K...B...K...B...' + 'K...B...K...B.CC',
+    Q: 'h.o.'.repeat(16), kik: { drive: 4, decay: 0.2, sweep: 4, st: 0.02, gain: 0.9 }, roll: 'S', dogra: false, sert: true, tempo: 175,
+  },
+  gabber: {
+    ad: 'gabber', A: 'X...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K.K.',
+    Q: '..o.'.repeat(16), kik: { drive: 10, decay: 0.32, sweep: 5, st: 0.035, gain: 0.75 }, roll: 'K', dogra: false, sert: true, tempo: 190,
+  },
+  french: {
+    ad: 'frenchcore', A: 'X...K...K...K...' + 'K...Z...K...Z...' + 'K...K...K...K...' + 'K...Z...K..KZ.KK',
+    Q: '..h.'.repeat(16), kik: { drive: 8, decay: 0.28, sweep: 5, st: 0.03, gain: 0.8 }, roll: 'K', dogra: false, sert: true, tempo: 200,
+  },
+  terror: {
+    ad: 'terrorcore', A: 'X..K..K.Z..K..K.' + 'K..K..K.Z..K.KKK' + 'K..K..K.Z..K..K.' + 'K.KK.KK.Z.ZZKKKK',
+    Q: '.h.h'.repeat(16), kik: { drive: 14, decay: 0.18, sweep: 6, st: 0.02, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 200,
+  },
+  speed: {
+    ad: 'speedcore', A: 'X.K.K.K.K.K.K.K.' + 'K.K.Z.K.K.K.Z.K.' + 'K.K.K.K.K.K.K.K.' + 'K.K.Z.K.KKKKKKKK',
+    Q: '.'.repeat(64), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220,
+  },
+  math: {
+    ad: 'mathcore', A: cell(7, 'K..S.s.'), Q: cell(5, 'h....'), kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
+  },
+};
+export const AMEN_H = { K: 0.5, X: 0.5, B: 0.5, Z: 0.5, S: 0.35, C: 0.35, s: 0.15, r: 0.08 }; // grafikte vuruşun boyu (r: yalnız metal)
+// Doğrama: sayfa sekiz yarım ölçü (c); her biri kalıbın σ[c]'inci yarım ölçüsünü çalar. ρ[c] tekrarın boyu (otuz
+// ikilik): 16 düz, 8 yarım ölçünün son yarısı iki kez, 1 son adımı her otuz ikilikte (roll).
+// { ch, vel, met, i, T } ya da null; otuz ikiliğin başında, kaynakta yeni bir on altılık başlıyorsa
 export function breakAt(sp, x) {
   const a = sp.amen;
   if (!a) return null;
+  const T = TURLER[a.tur] ?? TURLER.amen;
   const t = mod(Math.floor(8 * (x + 8)), 128);
   const c = t >> 4;
   const r = a.rho[c];
   const k = (t & 15) % r;
   if (k % 2 && r > 1) return null;
   const i = mod(8 * a.sig[c] + 8 - Math.ceil(r / 2) + Math.floor(k / 2), 64);
-  // roll: hep snare, yarım ölçü boyunca yükselerek
-  if (r <= 2) return { ch: 'S', vel: 0.35 + 0.65 * ((t & 15) / 15), ride: false, i };
-  const ch = AMEN[i];
-  const ride = i % 2 === 0;
-  if (ch === '.' && !ride) return null;
-  return { ch, vel: ch === 's' ? 0.35 : 1, ride, i };
+  // roll: türün roll davulu, yarım ölçü boyunca yükselerek
+  if (r <= 2) return { ch: T.roll, vel: 0.35 + 0.65 * ((t & 15) / 15), met: null, i, T };
+  const ch = T.A[i];
+  const met = T.Q[i] === '.' ? null : T.Q[i];
+  if (ch === '.' && !met) return null;
+  return { ch, vel: ch === 's' ? 0.35 : 1, met, i, T };
 }
 export const BREAK_Y = -2;
 export function breakY(sp, x) {
@@ -280,7 +324,7 @@ function clapRow(sp) {
 
 function breakRow(sp) {
   const k = `(⌊8${X}⌋ ${MOD} 16 ${MOD} ${V('ρ')})`;
-  return [`−${-BREAK_Y} + ${V('h')}(${V('A')}<sub>${V('a')}</sub>)${ex(`−30${FRAC}(8${X})`)}`, `${IF} ${k} ${MOD} 2 = 0, ${FRAC}(8${X}) &lt; ${HALF} <span class="op">(amen)</span>`];
+  return [`−${-BREAK_Y} + ${V('h')}(${V('A')}<sub>${V('a')}</sub>)${ex(`−30${FRAC}(8${X})`)}`, `${IF} ${k} ${MOD} 2 = 0, ${FRAC}(8${X}) &lt; ${HALF} <span class="op">(${(TURLER[sp.amen.tur] ?? TURLER.amen).ad})</span>`];
 }
 
 function perkRow(sp) {
@@ -353,12 +397,16 @@ export function renderFormula(sp, en = false) {
   }
   if (sp.amen) {
     const a = sp.amen;
+    const T = TURLER[a.tur] ?? TURLER.amen;
     defs.push(
       `${V('a')} = 8${V('σ')} + 8 − ⌈${fr(V('ρ'), 2)}⌉ + ⌊${fr(`⌊8${X}⌋ ${MOD} 16 ${MOD} ${V('ρ')}`, 2)}⌋`,
       `${V('σ')} = (${a.sig.map((d, i) => N('amen', d, `amen.s.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 2)}⌋]`,
       `${V('ρ')} = (${a.rho.map((d, i) => N('amen', d, `amen.r.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 2)}⌋]`,
-      `${V('A')} = ${AMEN.match(/.{16}/g).join(' ')}`,
-      `${V('h')}: K ${AMEN_H.K}, S ${AMEN_H.S}, s ${AMEN_H.s}, ride (${V('a')} ${MOD} 2 = 0) ${AMEN_H.r}`,
+      `${V('A')} = ${T.A.match(/.{16}/g).join(' ')}`,
+    );
+    if (/[^.]/.test(T.Q)) defs.push(`${V('Q')} = ${T.Q.match(/.{16}/g).join(' ')}`);
+    defs.push(
+      `${V('h')}: K X B Z ${AMEN_H.K}, S C ${AMEN_H.S}, s ${AMEN_H.s}${/[^.]/.test(T.Q) ? `, ${V('Q')} ${AMEN_H.r}` : ''}`,
     );
   }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);

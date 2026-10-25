@@ -3,13 +3,13 @@
 // sonraki sayfalar da oradan devam eder. "Kendi çeviriyor" açıkken acid ayarlarını eller çevirir (eller.js).
 // Ayarlar tarayıcıda saklanır.
 
-import { Besteci, PAGE, slideK } from './besteci.js?v=837f8128';
+import { Besteci, PAGE, slideK } from './besteci.js?v=220e1314';
 import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js?v=2a4d8fb9';
-import { renderFormula, MODE_NAMES, mod } from './formula.js?v=f73a0aec';
-import { Ses } from './ses.js?v=653bb3b6';
-import { View } from './view.js?v=15ada17f';
-import { Kayit } from './kayit.js?v=a1a3d80d';
-import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=6fdd0ff2';
+import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=ae888e31';
+import { Ses } from './ses.js?v=10485438';
+import { View } from './view.js?v=50032cdf';
+import { Kayit } from './kayit.js?v=4ebb03d9';
+import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=93257a7a';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
@@ -463,13 +463,14 @@ $('kalip').addEventListener('change', () => {
   besteci.settings.kalip = id;
   if (id) liveEdit((s) => besteci.useKalip(s, id), ['M', 'n', 'p', 'acc', 'bend', 'slide']);
 });
-// Amen seçilince çalan sayfa hemen breakbeat'le yeniden yazılır; breakcore'da besteci doğramayı kendi seçer
+// tür seçilince çalan sayfa hemen o türün davuluyla yeniden yazılır; doğranan türde besteci doğramayı kendi seçer
 $('amen').addEventListener('change', () => {
   besteci.settings.amen = $('amen').value || null;
   liveEdit((s) => besteci.useDograma(s), ['amen']);
-  // breakcore hızlı çalar: tempo yavaşsa 172'ye çıkar (sonra elle değiştirilebilir)
-  if (besteci.settings.amen === 'core' && num('tempo') < 160) {
-    $('tempo').value = 172;
+  // her tür kendi temposunda çalar (sonra elle değiştirilebilir)
+  const T = TURLER[besteci.settings.amen];
+  if (T?.tempo) {
+    $('tempo').value = T.tempo;
     $('tempo').dispatchEvent(new Event('input'));
     showValue($('tempo'));
   }
@@ -612,15 +613,15 @@ st.kalip = $('kalip').value || null;
 const sarkiQ = new URLSearchParams(location.search).get('sarki');
 if (sarkiQ && [...$('sarki').options].some((o) => o.value === sarkiQ)) $('sarki').value = sarkiQ;
 st.sarki = $('sarki').value || null;
-// ?break=amen ya da ?break=core adresi breakbeat'le açar
-const breakQ = new URLSearchParams(location.search).get('break');
+// ?break=core, ?break=gabber … (ya da ?tur=) adresi o türle ve temposuyla açar
+const breakQ = new URLSearchParams(location.search).get('break') ?? new URLSearchParams(location.search).get('tur');
 if (breakQ && [...$('amen').options].some((o) => o.value === breakQ)) $('amen').value = breakQ;
 st.amen = $('amen').value || null;
-if (breakQ === 'core' && num('tempo') < 160) {
-  $('tempo').value = 172;
+if (breakQ === st.amen && TURLER[st.amen]?.tempo) {
+  $('tempo').value = TURLER[st.amen].tempo;
   showValue($('tempo'));
 }
-if (st.amen === 'core') besteci.useDograma(besteci.s);
+if (TURLER[st.amen]?.dogra) besteci.useDograma(besteci.s);
 besteci.s.c = besteci.moodC();
 if (st.key !== null) besteci.s.base = besteci.keyBase(st.key);
 bpm = num('tempo');

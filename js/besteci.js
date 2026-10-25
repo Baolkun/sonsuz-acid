@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, mod } from './formula.js?v=f73a0aec';
+import { MODE_NAMES, TURLER, mod } from './formula.js?v=ae888e31';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
@@ -80,7 +80,7 @@ export const SARKILAR = {
     prog: [[4, 0, 4, 0], [3, 2, 4, 0]],
   },
 };
-// Breakcore doğramaları: σ sayfanın sekiz yarım ölçüsünde Amen'in hangi yarım ölçüsü çalar, ρ tekrarın boyu (otuz ikilik;
+// Doğramalar (breakcore, jungle, mathcore): σ sayfanın sekiz yarım ölçüsünde kalıbın hangi yarım ölçüsü çalar, ρ tekrarın boyu (otuz ikilik;
 // 16 düz). Hepsi ölçü başını kick'le açar, ikinci ve dördüncü vuruşta snare kalır: doğrama oynar ama ritim dağılmaz
 export const DOGRAMALAR = [
   { sig: [0, 1, 0, 1, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
@@ -228,9 +228,9 @@ export class Besteci {
     s.slide = this.rng.chance(0.8) ? this.slideStep(s) : null;
   }
 
-  // Amen'in doğraması: breakcore'da şimdikinden başka bir doğrama, düz Amen'de düz
+  // kalıbın doğraması: doğranan türde şimdikinden başka bir doğrama, ötekilerde düz
   useDograma(s) {
-    if (this.settings.amen !== 'core') {
+    if (!TURLER[this.settings.amen]?.dogra) {
       s.amen = clone(AMEN_DUZ);
       return;
     }
@@ -259,7 +259,7 @@ export class Besteci {
     this.newWanted = false;
     this.at = 0;
     s.tema = null;
-    if (settings.amen === 'core') this.useDograma(s);
+    if (TURLER[settings.amen]?.dogra) this.useDograma(s);
     if (this.journey === 1) {
       this.plan = [0, 1, 2, 3, ...ENDING];
       // kalıp seçildiyse ilk yolculuk da onunla çalar
@@ -304,7 +304,7 @@ export class Besteci {
     if (f.hat && !settings.hat) keys.push('hat');
     if (f.clap && !settings.clap && s.clap !== 'dort') keys.push('clap');
     if (f.perk && !settings.perk) keys.push('perk');
-    if (settings.amen === 'core') keys.push('amen', 'amen', 'amen');
+    if (TURLER[settings.amen]?.dogra) keys.push('amen', 'amen', 'amen');
     const k = rng.pick(keys);
     if (k === 'amen') this.useDograma(s);
     if (k === 'slide') s.slide = s.M && s.slide !== null && rng.chance(0.25) ? null : this.slideStep(s, s.slide) ?? s.slide;
@@ -372,16 +372,16 @@ export class Besteci {
       gap: !!s.gap,
       pad: f.pad ? { lvl: f.pad } : null,
     };
-    // Amen: kick çalacak bölümlerde kick'in, clap'in, hat'in ve ek vurmalının yerine (elle seçilenler kalır; rim ve tom
-    // Amen'in senkopunun üstüne binince karışıyordu). Drop'ta düz Amen döner;
-    // cümle sonunda son yarım ölçü dolgu (breakcore'da snare roll), yükselişin son ölçüsünde roll hızlanarak gelir
+    // Tür (Amen, gabber …): kick çalacak bölümlerde kick'in, clap'in, hat'in ve ek vurmalının yerine (elle seçilenler
+    // kalır; rim ve tom Amen'in senkopunun üstüne binince karışıyordu). Doğranan türde drop'ta düz kalıp döner;
+    // cümle sonunda son yarım ölçü dolgu (sert türlerde roll), yükselişin son ölçüsünde roll hızlanarak gelir
     if (st.amen && kick) {
-      const core = st.amen === 'core';
-      const a = core && s.drop ? clone(AMEN_DUZ) : clone(s.amen);
-      if (s.gap) a.rho = [16, 16, 16, 16, 16, 16, 8, 4].map((r, i) => (core ? [16, 16, 16, 16, 8, 4, 2, 1][i] : r));
+      const T = TURLER[st.amen];
+      const a = { ...clone(T.dogra && s.drop ? AMEN_DUZ : s.amen), tur: st.amen };
+      if (s.gap) a.rho = T.sert ? [16, 16, 16, 16, 8, 4, 2, 1] : [16, 16, 16, 16, 16, 16, 8, 4];
       else if (s.roll || s.son) {
-        a.rho[7] = core ? 1 : 8;
-        if (core) a.rho[6] = 8;
+        a.rho[7] = T.sert ? 1 : 8;
+        if (T.sert) a.rho[6] = 8;
       }
       Object.assign(sp, { amen: a, kick: null, clap: st.clap ? sp.clap : null, hat: st.hat ? sp.hat : null, perk: st.perk ? sp.perk : null });
     }

@@ -12,7 +12,7 @@ function squeeze(ctx) {
 
 export class Ses {
   static async create(ctx) {
-    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=d62fe49f', import.meta.url));
+    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=0213a6eb', import.meta.url));
     return new Ses(ctx);
   }
 

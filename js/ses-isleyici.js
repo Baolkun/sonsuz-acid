@@ -22,11 +22,13 @@
 // Ek vurmalı satırı: shaker (gürültü, tizde bir bantta, kısa), rim (808'deki gibi iki kısa çınlayan sinüs, biraz
 // kırpılmış: tahta "tok"), tom (perdesi hızla inen sinüs; iki ölçünün sonunda akorun beşlisinden köküne iner).
 // Tom, rim ve snare'in perdesi tona oturur (drumHz).
-// Amen satırı (break): kendi davul takımı, otuz ikiliğe girerken satır tanımlıysa vurulur. Kick perdesi hızla inen
-// sinüs (pompayı o da tetikler), snare iki kısa sinüs ve süzülmüş gürültü (hayalet snare kısık ve kısa), ride hat'in
-// metali alçak bir bantta uzun söner, crash tizde uzun gürültü. Düzeyleri Kick, Clap ve Hat ayarlarından gelir.
+// Tür satırı (Amen, gabber …): kendi davul takımı, otuz ikiliğe girerken satır tanımlıysa vurulur. Kick perdesi hızla
+// inen sinüs (pompayı o da tetikler), türün kick'iyle doyurulur (gabber'da neredeyse kare: uzun, perdeli "bum"); snare
+// iki kısa sinüs ve süzülmüş gürültü (hayalet snare kısık ve kısa), ride hat'in metali alçak bir bantta uzun söner,
+// crash tizde uzun gürültü. Clap ve hat'ler clap ve hat satırının sesiyle çalar. Düzeyleri Kick, Clap ve Hat
+// ayarlarından gelir.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, REF_HZ, KICK_HZ } from './formula.js?v=f73a0aec';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=ae888e31';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -63,7 +65,6 @@ const SHAKER_DECAY = 0.03; // s
 const RIM_RATIO = 3.66; // 808'in rim'i: 455 ve 1667 Hz; ilki tona oturur, ikincisi aynı oranda
 const RIM_DECAY = [0.012, 0.007]; // s
 const TOM_DECAY = 0.22; // s
-const BK_DECAY = 0.16; // s: Amen'in kick'i
 const SN_RATIO = 1.78; // snare'in gövdesi: tona oturan sinüs ve onun bu katı
 const SN_DECAY = [0.05, 0.13]; // s: gövde, gürültü (hayalet snare'de yarısı)
 const SN_HP = 900; // Hz: snare gürültüsünün altı
@@ -180,6 +181,8 @@ class FormulSes extends AudioWorkletProcessor {
     this.bkAge = 1;
     this.bkPh = 0;
     this.bkHz = KICK_HZ;
+    this.bkVel = 1;
+    this.bkK = TURLER.amen.kik;
     this.snAge = 1;
     this.snVel = 1;
     this.snPh = new Float64Array(2);
@@ -396,21 +399,33 @@ class FormulSes extends AudioWorkletProcessor {
           this.bt = bt;
           const h = breakAt(sp, x);
           if (h) {
-            if (h.ch === 'K' || h.ch === 'X') {
+            if ('KXBZ'.includes(h.ch)) {
               this.bkAge = 0;
               this.bkPh = 0;
+              this.bkVel = h.vel;
+              this.bkK = h.T.kik;
               this.bkHz = KICK_HZ * 2 ** ((sp.base + 12) / 12);
             }
-            if (h.ch === 'S' || h.ch === 's') {
+            if ('SsZ'.includes(h.ch)) {
               this.snAge = 0;
               this.snVel = h.vel;
               this.snHz = drumHz(sp, x, 'snare');
               this.snPh.fill(0);
             }
+            if ('CB'.includes(h.ch)) {
+              this.cAge = 0;
+              this.cG = Math.tan((Math.PI * REF_HZ * 2 ** (CLAP_Y + 0.3 + CLAP_OCT)) / sr);
+            }
             if (h.ch === 'X') this.crAge = 0;
-            else if (h.ride) {
+            else if (h.met === 'r') {
               this.rdAge = 0;
               this.rdVel = h.i % 4 === 0 ? 1 : 0.6;
+            } else if (h.met) {
+              const open = h.met === 'o';
+              this.hAge = 0;
+              this.hVel = h.i % 4 === 2 ? 1 : 0.7;
+              this.hDecay = HAT_DECAY[open ? 1 : 0] * (open ? now.hatLen : Math.sqrt(now.hatLen));
+              this.hG = Math.tan((Math.PI * Math.min(REF_HZ * 2 ** (HAT_Y + 0.3 + HAT_OCT), 0.45 * sr)) / sr);
             }
           }
         }
@@ -555,9 +570,10 @@ class FormulSes extends AudioWorkletProcessor {
       let bk = 0;
       if (this.bkAge < 1) {
         const a = this.bkAge;
-        this.bkPh += (this.bkHz * (1 + 3 * Math.exp(-a / 0.012))) / sr;
+        const K = this.bkK;
+        this.bkPh += (this.bkHz * (1 + K.sweep * Math.exp(-a / K.st))) / sr;
         if (this.bkPh >= 1) this.bkPh -= 1;
-        bk = (Math.tanh(KICK_DRIVE * Math.sin(TAU * this.bkPh)) / Math.tanh(KICK_DRIVE)) * 1.2 * Math.exp(-a / BK_DECAY) * (1 - Math.exp(-a / 0.0005));
+        bk = (Math.tanh(K.drive * Math.sin(TAU * this.bkPh)) / Math.tanh(K.drive)) * K.gain * this.bkVel * Math.exp(-a / K.decay) * (1 - Math.exp(-a / 0.0005));
       }
       this.bkAge += 1 / sr;
       let brk = 0;
