@@ -142,8 +142,9 @@ export function padY(sp, x, i) {
 }
 
 // hat ve clap satırları: adımın ilk yarısında tanımlı; y sesin parlaklığı (gürültünün süzüldüğü yer), başta parlak
-export const HAT_Y = 2.1;
-export const CLAP_Y = -2.3;
+// şeritler perdelerin (kick, pad, melodi: aşağı yukarı −2 … 2,2) dışında: hat ve perküsyon üstte, clap altta
+export const HAT_Y = 3;
+export const CLAP_Y = -2.7;
 const GATE = 0.5;
 export function hatY(sp, x) {
   const u = frac(4 * x) - SWING * mod(Math.floor(4 * x), 2);
@@ -151,7 +152,7 @@ export function hatY(sp, x) {
   return hit ? HAT_Y + 0.3 * hit.vel * Math.exp(-(hit.open ? 8 : 30) * u) : null;
 }
 // ek vurmalı satırı hat'in altında; söner: shaker orta, rim hızlı, tom yavaş
-export const PERK_Y = 1.75;
+export const PERK_Y = 2.5;
 export const PERK_K = { shaker: 18, rim: 40, tom: 6 };
 export function perkY(sp, x) {
   const u = frac(4 * x) - (sp.perk?.ses === 'shaker' ? SWING * mod(Math.floor(4 * x), 2) : 0);
@@ -262,7 +263,8 @@ function extras(sp) {
   return s;
 }
 
-export function renderFormula(sp) {
+// en: İngilizce (video kaydı için)
+export function renderFormula(sp, en = false) {
   let mel = bassFrac(sp);
   if (sp.hocket) mel = brace([[hocketPart(sp), `${IF} ${V('j')} ${MOD} 3 &gt; 0`], [mel]]);
   mel += extras(sp);
@@ -281,7 +283,7 @@ export function renderFormula(sp) {
   }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);
   defs.push(`${V('r')} = (${sp.prog.map((d, i) => N('prog', d, `prog.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 4)}⌋]`);
-  if (sp.gap) defs.push(`${X} ≥ 7.5: ${V('y')} tanımsız (drop öncesi boşluk)`);
+  if (sp.gap) defs.push(`${X} ≥ 7.5: ${V('y')} ${en ? 'undefined (gap before the drop)' : 'tanımsız (drop öncesi boşluk)'}`);
   defs.push(`${V('S')}(${V('m')}) = ⌊${fr(`12${V('m')} + ${N('c', sp.c, 'c')}`, 7)}⌋`);
   return `<div class="denklem">${V('y')} = ${main}</div><div class="tanimlar">${defs.map((d) => `<span>${d}</span>`).join('')}</div>`;
 }

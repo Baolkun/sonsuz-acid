@@ -243,7 +243,8 @@ function frame() {
   if (page !== shown) showPage(page);
   view.draw(page, beat - page.beat - 8);
   if (kayit.active) {
-    kayit.draw(page, beat - page.beat - 8, $('bolum').textContent, $('bilgi').textContent);
+    kayit.lang = $('kayitDil').value;
+    kayit.draw(page, beat - page.beat - 8, { tr: $('bilgi').textContent, bpm, renk: oto && renk, tini: oto && tini });
     const t = Math.floor(kayit.seconds);
     $('kayitBtn').textContent = `■ Bitir ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
   }

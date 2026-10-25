@@ -1,17 +1,33 @@
-// Video kaydı: kâğıdı (rengi ve kırışıklarıyla), bölümün adını ve grafiği TikTok'a uygun dikey bir tuvale (1080×1920)
-// çizer, sesle birlikte MediaRecorder'a verir. Bitince dosya indirilir.
+// Video kaydı: kâğıdı (rengi ve kırışıklarıyla), bölümün adını, grafiği ve formülü TikTok'a uygun dikey bir tuvale
+// (1080×1920) çizer, sesle birlikte MediaRecorder'a verir. Bitince dosya indirilir. Yazılar Türkçe ya da İngilizce.
+// Formül resim olarak değil, görünmez bir kutuda sayfadaki gibi dizdirilip harflerin yerleri okunarak çizilir.
 
 import { View } from './view.js';
+import { renderFormula, MODE_NAMES } from './formula.js';
 
 const W = 540; // mantıksal boyut; piksel çarpanı S ile 1080×1920
 const H = 960;
 const S = 2;
-const GRAF = { y: 210, h: 620 };
+const GRAF = { y: 112, h: 450 };
+const FORM = { x: 14, y: 574, w: W - 28, h: 300 };
 const INK = '#13140f';
 const SOLUK = 'rgba(19, 20, 15, .6)';
 const MATH = '"STIX Two Math", "STIX Two Text", "Latin Modern Math", "Times New Roman", serif';
 // önce mp4 (TikTok ve telefonlar doğrudan açar), olmazsa webm
 const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+const BRACE = 'M9 1C4 1 5.5 10 5.5 24S5 47 1 50C5 53 5.5 62 5.5 76S4 99 9 99'; // formula.js'teki küme parantezi
+
+const EN = {
+  bolum: { bir: 'one', iki: 'two', üç: 'three', dört: 'four', beş: 'five', altı: 'six', kırılma: 'break', drop: 'drop', 'tema geri': 'theme returns' },
+  mode: ['Locrian', 'Phrygian', 'Aeolian', 'Dorian', 'Mixolydian', 'Ionian', 'Lydian'],
+  kalip: { 'ara vuruş': 'offbeat', 'vuruş öncesi': 'before the beat', 'vuruş sonrası': 'after the beat', üçlü: 'threes', videodaki: 'original' },
+  renk: { kuru: 'dry', derin: 'deep', parlak: 'bright', siki: 'tight', genis: 'wide' },
+  tini: { testere: 'saw', kesik: 'clipped', karisik: 'mixed', kayan: 'sliding', oyuk: 'hollow', kare: 'square' },
+};
+const SOZ = {
+  tr: { alt: 'müziğin tamamı tek bir formül' },
+  en: { alt: 'the whole track is one formula' },
+};
 
 export class Kayit {
   constructor(kagit) {
@@ -22,22 +38,131 @@ export class Kayit {
     this.g = this.canvas.getContext('2d');
     const graf = document.createElement('canvas');
     this.graf = graf;
-    this.view = new View(graf, { width: W, height: GRAF.h, dpr: S });
+    // videoda grafik geniş ve uzun: x yalnız sayfanın aralığı, üstte yazı payı yok (başlık grafiğin üstünde)
+    this.view = new View(graf, { width: W, height: GRAF.h, dpr: S }, { xMin: -8.7, xMax: 9.3, top: 8 });
     // kırışık dokusu sayfanın kendi CSS'inden
     const m = getComputedStyle(kagit).backgroundImage.match(/url\("(data:image\/svg\+xml.+?)"\)/);
     this.doku = new Image();
     if (m) this.doku.src = m[1].replace(/\\"/g, '"');
+    // formülün dizildiği görünmez kutu
+    this.box = document.createElement('div');
+    this.box.className = 'formul';
+    this.box.setAttribute('aria-hidden', 'true');
+    this.box.style.cssText = 'position:fixed;left:-20000px;top:0;width:640px;height:auto;flex:none;overflow:visible;visibility:hidden;pointer-events:none';
+    kagit.append(this.box);
     this.rec = null;
+    this.lang = 'tr';
+    this.sp = null; // dizilmiş formülün sayfası
   }
 
   get active() {
     return !!this.rec;
   }
 
-  // her karede: çalan sayfa, kalemin konumu, üstteki iki yazı
-  draw(page, x, bolum, bilgi) {
+  // formülü kutuda dizdirir; yazı parçalarını (aynı satırdaki harfler bir arada), kesir çizgilerini ve parantezleri toplar
+  layout(sp) {
+    const { box, g } = this;
+    box.innerHTML = renderFormula(sp, this.lang === 'en');
+    const o = box.getBoundingClientRect();
+    const texts = [];
+    const range = document.createRange();
+    const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    for (let n; (n = walk.nextNode()); ) {
+      if (!n.data.trim()) continue;
+      const el = n.parentElement;
+      const cs = getComputedStyle(el);
+      const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const color = el.closest('.tanimlar') ? SOLUK : INK;
+      let run = null;
+      for (let i = 0; i < n.data.length; i++) {
+        range.setStart(n, i);
+        range.setEnd(n, i + 1);
+        const r = range.getClientRects()[0];
+        if (!r) continue;
+        if (run && Math.abs(r.top - run.top) < 1) run.text += n.data[i];
+        else {
+          if (run) texts.push(run);
+          run = { text: n.data[i], x: r.left - o.left, top: r.top - o.top, h: r.height, font, color };
+        }
+      }
+      if (run) texts.push(run);
+    }
+    // taban çizgisi: harfin kutusu yazı tipinin üst ve alt payı kadar
+    for (const t of texts) {
+      g.font = t.font;
+      const m = g.measureText('x');
+      const a = m.fontBoundingBoxAscent ?? t.h * 0.8;
+      const d = m.fontBoundingBoxDescent ?? t.h * 0.2;
+      t.y = t.top + (t.h - a - d) / 2 + a;
+      t.right = t.x + g.measureText(t.text).width;
+    }
+    const lines = [];
+    const braces = [];
+    for (const el of box.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect();
+      if (el.classList.contains('kume')) braces.push({ x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height });
+      const cs = getComputedStyle(el);
+      if (cs.borderBottomStyle === 'solid' && parseFloat(cs.borderBottomWidth) > 0) {
+        lines.push({ x: r.left - o.left, y: r.bottom - o.top - parseFloat(cs.borderBottomWidth) / 2, w: r.width });
+      }
+    }
+    // kutunun değil yazının genişliği: koşullar sütunu dar kalınca formül büyüyebilir
+    const w = Math.max(...texts.map((t) => t.right), ...lines.map((l) => l.x + l.w), 1);
+    this.formula = { texts, lines, braces, w, h: box.scrollHeight };
+    this.sp = sp;
+  }
+
+  drawFormula(sp) {
+    if (sp !== this.sp || this.langOf !== this.lang) {
+      this.layout(sp);
+      this.langOf = this.lang;
+    }
+    const { g } = this;
+    const f = this.formula;
+    const k = Math.min(FORM.w / f.w, FORM.h / f.h, 1.3);
+    g.save();
+    g.translate(FORM.x, FORM.y);
+    g.scale(k, k);
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
+    for (const t of f.texts) {
+      g.font = t.font;
+      g.fillStyle = t.color;
+      g.fillText(t.text, t.x, t.y);
+    }
+    g.strokeStyle = INK;
+    g.lineWidth = 1;
+    for (const l of f.lines) {
+      g.beginPath();
+      g.moveTo(l.x, l.y);
+      g.lineTo(l.x + l.w, l.y);
+      g.stroke();
+    }
+    g.lineWidth = 1.1;
+    for (const b of f.braces) {
+      const p = new Path2D();
+      p.addPath(new Path2D(BRACE), new DOMMatrix().translate(b.x, b.y).scale(b.w / 10, b.h / 100));
+      g.stroke(p);
+    }
+    g.restore();
+  }
+
+  // üstteki yazı: Türkçede sayfadakinin aynısı, İngilizcede sayfanın bilgilerinden
+  texts(page, info) {
+    if (this.lang !== 'en') return [page.name, info.tr];
+    const name = page.name.split(' · ').map((w) => EN.bolum[w] ?? w).join(' · ');
+    const mode = EN.mode[MODE_NAMES.indexOf(page.mode)] ?? page.mode;
+    const kalip = page.kalip ? ` · ${EN.kalip[page.kalip] ?? page.kalip}` : '';
+    const renk = info.renk ? ` · color: ${EN.renk[info.renk]}` : '';
+    const tini = info.tini ? ` · tone: ${EN.tini[info.tini]}` : '';
+    return [name, `${page.key} ${mode} · ${info.bpm} BPM · journey ${page.journey}${kalip}${renk}${tini}`];
+  }
+
+  // her karede: çalan sayfa, kalemin konumu; info: { tr: sayfadaki bilgi yazısı, bpm, renk, tini }
+  draw(page, x, info) {
     if (!this.rec) return;
     const { g } = this;
+    const [bolum, bilgi] = this.texts(page, info);
     g.setTransform(S, 0, 0, S, 0, 0);
     g.globalCompositeOperation = 'source-over';
     g.fillStyle = getComputedStyle(this.kagit).backgroundColor;
@@ -58,24 +183,28 @@ export class Kayit {
 
     g.fillStyle = INK;
     g.textAlign = 'left';
-    g.font = `40px ${MATH}`;
-    g.fillText(bolum, 30, 130, W - 60);
+    g.font = `36px ${MATH}`;
+    g.fillText(bolum, 24, 62, W - 48);
     g.fillStyle = SOLUK;
-    g.font = `16px ${MATH}`;
-    g.fillText(bilgi, 30, 165, W - 60);
+    g.font = `14px ${MATH}`;
+    g.fillText(bilgi, 24, 90, W - 48);
 
     this.view.draw(page, x);
     g.drawImage(this.graf, 0, GRAF.y, W, GRAF.h);
+    this.drawFormula(page.sp);
 
     g.fillStyle = SOLUK;
     g.textAlign = 'center';
-    g.font = `italic 18px ${MATH}`;
-    g.fillText('müziğin tamamı tek bir formül', W / 2, H - 120);
-    g.font = `14px ${MATH}`;
-    g.fillText('baolkun.github.io/sonsuz-acid', W / 2, H - 92);
+    g.font = `italic 17px ${MATH}`;
+    g.fillText(SOZ[this.lang].alt, W / 2, H - 64);
+    g.font = `13px ${MATH}`;
+    g.fillText('baolkun.github.io/sonsuz-acid', W / 2, H - 42);
   }
 
   start(audio) {
+    // hiç boyanmamış tuvalden alınan görüntü izi boş kalıyor (Chrome): önce kâğıt
+    this.g.fillStyle = getComputedStyle(this.kagit).backgroundColor;
+    this.g.fillRect(0, 0, this.canvas.width, this.canvas.height);
     const video = this.canvas.captureStream(30);
     const stream = new MediaStream([...video.getVideoTracks(), ...audio.getAudioTracks()]);
     const mimeType = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';

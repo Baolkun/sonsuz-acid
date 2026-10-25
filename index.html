@@ -56,7 +56,7 @@
   .bilgi { font-size: 12.5px; color: var(--soluk); margin-top: 2px; }
   /* tuval bir kutunun içinde: kendi piksel boyutu yerleşimi büyütmesin */
   /* grafiğin boyu sabit: formül uzayınca eğrilerin ölçeği değişmesin */
-  .cizim { position: relative; flex: none; height: clamp(240px, 44vh, 520px); }
+  .cizim { position: relative; flex: none; height: clamp(260px, 50vh, 580px); }
   canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
   /* formül */
@@ -160,6 +160,7 @@
       <button id="kirilmaBtn" class="hamle" title="Sonraki sayfa kırılma: kick susar; ardından yükseliş ve drop. Kısayol: K">Kırılma <kbd>K</kbd></button>
       <button id="dropBtn" class="hamle" title="Sonraki sayfa yükseliş, ardından drop: her şey birden geri gelir. Kısayol: D">Drop <kbd>D</kbd></button>
       <button id="kayitBtn" class="kayit" aria-pressed="false" title="Grafiği ve sesi dikey (TikTok boyu) bir videoya kaydeder; bitirince dosya iner. Kayıt sürerken bu sekme önde kalsın.">● Video kaydet</button>
+      <select id="kayitDil" title="Videodaki yazıların ve formülün dili"><option value="tr" selected>Türkçe video</option><option value="en">English video</option></select>
       <button id="oto" class="oto" aria-pressed="true" title="Sarı yazılı ayarları müzik bölüme göre kendisi çevirir. Bir sürgüyü tutarsan bıraktıktan sonra da bir süre sende kalır; bıraktığın yer yeni merkezi olur.">Kendi çeviriyor</button>
       <label class="ayar"><span>Tempo</span><input id="tempo" type="range" min="120" max="150" value="139"><output></output></label>
       <label class="ayar"><span>Ses</span><input id="ses" type="range" min="0" max="100" value="75"></label>

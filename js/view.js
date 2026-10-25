@@ -5,18 +5,20 @@ import { kickY, melodyY, hatY, clapY, padY, perkY } from './formula.js';
 
 const X_MIN = -10.5;
 const X_MAX = 11.5;
-const Y_MIN = -2.5;
-const Y_MAX = 2.5;
+const Y_MIN = -3.1;
+const Y_MAX = 3.6;
 const INK = '#13140f';
 const RED = '#e2332a';
 const STEP = 1 / 64; // eğri bu sıklıkta örneklenir (vuruş)
 
 export class View {
   // size: sayfada olmayan tuval için sabit boyut { width, height, dpr } (video kaydı)
-  constructor(canvas, size = null) {
+  // frame: { xMin, xMax, top }: görünen x aralığı ve üstte yazıya bırakılan pay
+  constructor(canvas, size = null, frame = {}) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
     this.size = size;
+    this.frame = { xMin: X_MIN, xMax: X_MAX, top: 64, ...frame };
     this.resize();
     if (!size) new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
   }
@@ -35,9 +37,9 @@ export class View {
   draw(page, x) {
     const { g, w, h } = this;
     g.clearRect(0, 0, w, h);
-    const top = 40;
+    const { xMin, xMax, top } = this.frame;
     const bottom = h - 6;
-    const X = (v) => ((v - X_MIN) / (X_MAX - X_MIN)) * w;
+    const X = (v) => ((v - xMin) / (xMax - xMin)) * w;
     const Y = (v) => top + ((Y_MAX - v) / (Y_MAX - Y_MIN)) * (bottom - top);
     this.axes(X, Y);
     if (!page) {
@@ -105,9 +107,10 @@ export class View {
     g.lineWidth = 1.1;
     const y0 = Y(0);
     const x0 = X(0);
-    const right = X(X_MAX - 0.6);
+    const { xMin, xMax } = this.frame;
+    const right = X(xMax - 0.6);
     const up = Y(Y_MAX - 0.2);
-    line(g, X(X_MIN + 0.25), y0, right, y0);
+    line(g, X(xMin + 0.25), y0, right, y0);
     line(g, x0, Y(Y_MIN + 0.1), x0, up);
     // ok uçları
     g.beginPath();
