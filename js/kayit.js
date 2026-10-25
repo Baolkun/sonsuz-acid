@@ -1,5 +1,7 @@
 // Video kaydı: kâğıdı (rengi ve kırışıklarıyla), bölümün adını, grafiği ve formülü TikTok'a uygun dikey bir tuvale
 // (1080×1920) çizer, sesle birlikte MediaRecorder'a verir. Bitince dosya indirilir. Yazılar Türkçe ya da İngilizce.
+// Her şey TikTok'un güvenli alanında: üstteki sekmeler, sağdaki düğmeler ve alttaki açıklama hiçbir şeyi kapamaz.
+// Adresteki ?kanca=… verilirse en üst satırda o yazı çıkar (tanıtım videoları için).
 // Formül resim olarak değil, görünmez bir kutuda sayfadaki gibi dizdirilip harflerin yerleri okunarak çizilir.
 
 import { View } from './view.js';
@@ -9,11 +11,15 @@ import { pageName, infoLine } from './dil.js';
 const W = 540; // mantıksal boyut; piksel çarpanı S ile 1080×1920
 const H = 960;
 const S = 2;
-const GRAF = { y: 112, h: 450 };
-const FORM = { x: 14, y: 574, w: W - 28, h: 300 };
+const SAFE = { l: 30, r: W - 75, t: 100, b: H - 240 }; // TikTok arayüzünün kapamadığı alan
+const CW = SAFE.r - SAFE.l;
+const MID = SAFE.l + CW / 2;
+const GRAF = { y: 226, h: 290 };
+const FORM = { x: SAFE.l, y: 526, w: CW, h: SAFE.b - 4 - 526 };
 const INK = '#13140f';
 const SOLUK = 'rgba(19, 20, 15, .6)';
 const MATH = '"STIX Two Math", "STIX Two Text", "Latin Modern Math", "Times New Roman", serif';
+const SANS = '"Helvetica Neue", Helvetica, Arial, sans-serif';
 // önce mp4 (TikTok ve telefonlar doğrudan açar), olmazsa webm
 const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
 const BRACE = 'M9 1C4 1 5.5 10 5.5 24S5 47 1 50C5 53 5.5 62 5.5 76S4 99 9 99'; // formula.js'teki küme parantezi
@@ -33,7 +39,7 @@ export class Kayit {
     const graf = document.createElement('canvas');
     this.graf = graf;
     // videoda grafik geniş ve uzun: x yalnız sayfanın aralığı, üstte yazı payı yok (başlık grafiğin üstünde)
-    this.view = new View(graf, { width: W, height: GRAF.h, dpr: S }, { xMin: -8.7, xMax: 9.3, top: 8 });
+    this.view = new View(graf, { width: CW, height: GRAF.h, dpr: S }, { xMin: -8.7, xMax: 9.3, top: 8 });
     // kırışık dokusu sayfanın kendi CSS'inden
     const m = getComputedStyle(kagit).backgroundImage.match(/url\("(data:image\/svg\+xml.+?)"\)/);
     this.doku = new Image();
@@ -47,6 +53,7 @@ export class Kayit {
     this.rec = null;
     this.lang = 'tr';
     this.sp = null; // dizilmiş formülün sayfası
+    this.kanca = new URLSearchParams(location.search).get('kanca');
   }
 
   get active() {
@@ -165,24 +172,32 @@ export class Kayit {
     g.fillStyle = fold;
     g.fillRect(0, 0, W, H);
 
-    g.fillStyle = INK;
-    g.textAlign = 'left';
-    g.font = `36px ${MATH}`;
-    g.fillText(bolum, 24, 62, W - 48);
+    // en üstte kanca ya da alt yazı, altında adres
+    g.textAlign = 'center';
+    if (this.kanca) {
+      g.fillStyle = INK;
+      g.font = `bold 23px ${SANS}`;
+      g.fillText(this.kanca, MID, 128, CW);
+    } else {
+      g.fillStyle = SOLUK;
+      g.font = `italic 19px ${MATH}`;
+      g.fillText(SOZ[this.lang].alt, MID, 128, CW);
+    }
     g.fillStyle = SOLUK;
-    g.font = `14px ${MATH}`;
-    g.fillText(bilgi, 24, 90, W - 48);
+    g.font = `13px ${MATH}`;
+    g.fillText('baolkun.github.io/sonsuz-acid', MID, 150, CW);
+
+    g.textAlign = 'left';
+    g.fillStyle = INK;
+    g.font = `32px ${MATH}`;
+    g.fillText(bolum, SAFE.l, 196, CW);
+    g.fillStyle = SOLUK;
+    g.font = `12px ${MATH}`;
+    g.fillText(bilgi, SAFE.l, 216, CW);
 
     this.view.draw(page, x);
-    g.drawImage(this.graf, 0, GRAF.y, W, GRAF.h);
+    g.drawImage(this.graf, SAFE.l, GRAF.y, CW, GRAF.h);
     this.drawFormula(page.sp);
-
-    g.fillStyle = SOLUK;
-    g.textAlign = 'center';
-    g.font = `italic 17px ${MATH}`;
-    g.fillText(SOZ[this.lang].alt, W / 2, H - 64);
-    g.font = `13px ${MATH}`;
-    g.fillText('baolkun.github.io/sonsuz-acid', W / 2, H - 42);
     this.track.requestFrame?.();
   }
 
