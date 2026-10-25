@@ -15,12 +15,26 @@
 // enerjisine göre seçilir, art arda iki sayfa aynı renkte olmaz; sayfa başında iki vuruşta yerine oturur. Sayfa içinde:
 // yükselişte pompa derinleşir ve hat uzar, nefeste hat boyu filtreyle birlikte açılıp kapanır, cümle sonunda oda
 // kabarır, kırılmada oda genişler.
+// Acid sesinin tınısı (dalga: testereden kareye, kayma: notalar arası kaymanın uzunluğu) da bir kalıptan gelir:
+// testere, kesik, karışık, kayan, oyuk, kare. Tını her sayfada değil, bölüm değişince (ve drop'ta) değişir; enerjili
+// bölümde testereye, sakinde kareye yakın olanlar sık seçilir. Dalga iki ölçüde yavaşça döner, yükselişte testereye
+// çekilir; kayma sayfa başında oturur (bir sonra yazılan sayfada duyulur), kırılmada uzar.
 // Sürgüler kullanıcının yerleştirdiği yerin ("ev") çevresinde gezinir. Kullanıcı bir sürgüyü tutarsa sürgü
 // bırakıldıktan sonra da bir süre onda kalır, sonra hareket yavaşça geri gelir; yeni ev bırakıldığı yerdir.
 
 export const KNOBS = {
   filtre: [-100, 100], rezonans: [0, 100], zarf: [0, 100], kuyruk: [0, 100], vurgu: [0, 100], doygunluk: [0, 100], yanki: [0, 100],
   pompa: [0, 100], oda: [0, 100], pad: [0, 100], hat: [0, 100], hatboyu: [0, 100], perk: [0, 100],
+  dalga: [0, 100], kayma: [0, 100],
+};
+// acid sesinin tınısı: dalganın evden sapması (0 testere … 100 kare) ve kaymanın; e: hangi enerjide sık seçilir
+export const TINILAR = {
+  testere: { ad: 'testere', dalga: 0, kayma: 0, e: 1 },
+  kesik: { ad: 'kesik', dalga: 15, kayma: -30, e: 0.8 },
+  karisik: { ad: 'karışık', dalga: 40, kayma: 10, e: 0.6 },
+  kayan: { ad: 'kayan', dalga: 5, kayma: 30, e: 0.45 },
+  oyuk: { ad: 'oyuk', dalga: 75, kayma: -10, e: 0.3 },
+  kare: { ad: 'kare', dalga: 100, kayma: 20, e: 0.15 },
 };
 // sayfanın rengi: dokunun evden sapması ve kâğıdın rengi; e: hangi enerjide sık seçilir (0 sakin … 1 dolu)
 export const RENKLER = {
@@ -31,7 +45,7 @@ export const RENKLER = {
   genis: { ad: 'geniş', kagit: '#93d8e0', pompa: -8, oda: 26, pad: 20, hat: 4, hatboyu: 12, perk: -10, e: 0.2 },
 };
 // doku kendiliğinden bunların üstüne çıkmaz (kullanıcının evi daha yüksekse ev kalır): oda çok açılınca ses yıkanır
-const CAP = { pompa: 90, oda: 72, pad: 85, hat: 85, hatboyu: 88, perk: 85 };
+const CAP = { pompa: 90, oda: 72, pad: 85, hat: 85, hatboyu: 88, perk: 85, kayma: 85 }; // kayma: çok uzun kayınca notalar eriyor
 const HAT_LEN_BY_STAGE = [0, -10, -4, 6, 10, 18, 24]; // açık hat yükselişte ve kırılmada uzar
 const HOLD = 8; // vuruş: bırakılan sürgü bu kadar elde kalır
 const ENERGY = [0.1, 0.3, 0.5, 0.7, 0.8, 1, 0.35]; // bölüm bir … altı, kırılma
@@ -58,12 +72,14 @@ export class Eller {
     this.plans = null; // o sayfanın eğrileri
     this.last = null; // önceki sayfada filtrenin hareketi
     this.renk = null; // önceki sayfanın rengi
+    this.tini = null; // acid sesinin tınısı
+    this.tiniStage = null; // tınının seçildiği bölüm
   }
 
   // sayfanın rengi: enerjiye yakın olanlar daha sık, öncekinden başka
-  pickRenk(e) {
-    const ids = Object.keys(RENKLER).filter((id) => id !== this.renk);
-    const w = ids.map((id) => Math.exp(-((RENKLER[id].e - e) ** 2) / 0.08));
+  pickRenk(e, table = RENKLER, prev = this.renk) {
+    const ids = Object.keys(table).filter((id) => id !== prev);
+    const w = ids.map((id) => Math.exp(-((table[id].e - e) ** 2) / 0.08));
     let x = Math.random() * w.reduce((a, b) => a + b);
     for (let i = 0; i < ids.length; i++) if ((x -= w[i]) < 0) return ids[i];
     return ids[ids.length - 1];
@@ -81,6 +97,8 @@ export class Eller {
     this.plans = null;
     this.last = null;
     this.renk = null;
+    this.tini = null;
+    this.tiniStage = null;
   }
 
   // kullanıcı sürgüyü oynattı; down: parmağı hâlâ üstünde
@@ -149,6 +167,14 @@ export class Eller {
     const hat = -10 + 15 * e + R.hat + jit(3);
     const hatboyu = HAT_LEN_BY_STAGE[stage] + R.hatboyu + jit(4);
     const perk = R.perk + jit(3);
+    // tını: bölüm değişince ya da drop'ta yenisi
+    if (!this.tini || stage !== this.tiniStage || drop) {
+      this.tini = this.pickRenk(e, TINILAR, this.tini);
+      this.tiniStage = stage;
+    }
+    const tini = this.tini;
+    const Q = TINILAR[tini];
+    const kayma = Q.kayma + (quiet ? 20 : 0) + jit(3);
     const swell = toss || change || next === null ? 15 : 0; // cümle sonunda oda kabarır
     const enter = kind === 'tirmanis' ? (u) => -15 * (1 - ease(u / 16)) : () => 0; // girişte hat yavaşça gelir
     const TD = reset ?? 2;
@@ -156,6 +182,9 @@ export class Eller {
     return {
       kind,
       renk,
+      tini,
+      dalga: { T: 8, at: (u) => Q.dalga - (climb ? 40 * rise(u) : 0) },
+      kayma: { T: 0.5, at: cap('kayma', () => kayma) },
       pompa: { T: TD, at: cap('pompa', (u) => pompa + (climb ? 15 * rise(u) : 0)) },
       oda: { T: TD, at: cap('oda', (u) => oda + swell * ease((u - 12) / 4)) },
       pad: { T: TD, at: cap('pad', (u) => pad + (swell / 2) * ease((u - 12) / 4)) },

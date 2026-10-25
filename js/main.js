@@ -4,7 +4,7 @@
 // Ayarlar tarayıcıda saklanır.
 
 import { Besteci, PAGE, slideK } from './besteci.js';
-import { Eller, KNOBS, RENKLER } from './eller.js';
+import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js';
 import { renderFormula, MODE_NAMES, mod } from './formula.js';
 import { Ses } from './ses.js';
 import { View } from './view.js';
@@ -77,8 +77,9 @@ function automate() {
     // bölümün kaçıncı sayfası (tekrarında başka hareket); kilitliyken sayfa döndükçe hareketler sırayla değişir
     variant: besteci.locked ? page.no : (page.snap.prev?.run ?? 1) - 1,
   });
-  if (eller.plans.renk !== renk) {
+  if (eller.plans.renk !== renk || eller.plans.tini !== tini) {
     renk = eller.plans.renk;
+    tini = eller.plans.tini;
     showInfo(page);
   }
   let moved = false;
@@ -91,12 +92,15 @@ function automate() {
     moved = true;
   }
   if (moved) ses.params(soundParams());
+  // kayma formüle yazılır: çalan sayfa değişmez, sıradaki sayfa yeni kaymayla yazılır
+  besteci.settings.slide = num('kayma');
 }
 
 function setOto(on) {
   oto = on;
   if (!on) {
     renk = null;
+    tini = null;
     if (shown) showInfo(shown);
   }
   $('oto').setAttribute('aria-pressed', String(on));
@@ -188,8 +192,9 @@ function hamle(kind) {
 }
 
 let renk = null; // ellerin bu sayfaya verdiği renk
+let tini = null; // ve acid sesinin tınısı
 function showInfo(page) {
-  const r = oto && renk ? ` · renk: ${RENKLER[renk].ad}` : '';
+  const r = (oto && renk ? ` · renk: ${RENKLER[renk].ad}` : '') + (oto && tini ? ` · tını: ${TINILAR[tini].ad}` : '');
   // kâğıt da sayfanın rengini alır
   if (oto && renk) document.querySelector('.kagit').style.setProperty('--kagit', RENKLER[renk].kagit);
   else document.querySelector('.kagit').style.removeProperty('--kagit');
