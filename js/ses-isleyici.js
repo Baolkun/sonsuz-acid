@@ -9,6 +9,8 @@
 // 303'ten: vurgulu adımda (j = acc) nota daha yüksek, filtre daha açık ve keskin çalar; art arda vurgularda filtre
 // tam kapanmadan yeniden açıldığı için giderek yükselir ("accent sweep"). Dalga testereden kareye kaydırılabilir;
 // yankı tempoya oturur (noktalı sekizlik) ve yalnızca melodiye uygulanır.
+// Pompalama (sidechain): kick her vurduğunda melodi bir anlığına kısılır ve ~150 ms'de geri gelir; techno'nun
+// "nefes alan" hissi. Hat ve clap pompalanmaz.
 // Hat satırı: 808'deki gibi altı kare dalga (uyumsuz frekanslarda, metalik) ve biraz gürültü, tizi süzülerek. Satır
 // tanımlı olmaya başlayınca vurulur (swing de satırda), şiddeti satırdaki v; açık hat uzun söner, sonraki hat onu keser.
 // Clap satırı: gürültü, ortada süzülür; başı birkaç milisaniye arayla üç kez çarpar (eller), ardından kısa bir kuyruk.
@@ -35,6 +37,8 @@ const KICK_DECAY = 0.17; // s: kick'in sönüşü
 const KICK_DRIVE = 1.8; // tanh doygunluğu: üst harmonikler, tok vuruş
 const CLICK = 0.35; // başındaki tık…
 const CLICK_TIME = 0.0015; // …bu sürede söner
+const PUMP_DEPTH = 0.7; // tam pompada melodi bu kadar kısılır…
+const PUMP_TIME = 0.1; // s: …ve bu süreyle geri gelir
 const HAT = 0.18;
 const CLAP = 0.24;
 const HAT_DECAY = [0.022, 0.13]; // s: kapalı, açık
@@ -45,7 +49,7 @@ const CLAP_OCT = 5.2; // clap: ≈ 1,5 kHz
 const CLAP_Q = 0.8; // 1/Q
 const CLAP_GAP = 0.011; // s: ellerin çarpma arası
 const CLAP_TAIL = 0.11; // s
-const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP };
+const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5 };
 const DRIVE_GAIN = 2; // doygunlukta kırpma eşiği (filtre çıkışı 3,5'e kadar çıkıyor)
 const DRIVE_POW = 0.4; // sürüş arttıkça düzey bu üsle geri alınır, açınca ses patlamasın ya da kısılmasın
 const ACC_ENV = 1.2; // oktav: tam vurguda filtre zarfına eklenen
@@ -183,6 +187,7 @@ class FormulSes extends AudioWorkletProcessor {
       now.echo += (prm.echo - now.echo) * sm;
       now.hat += (prm.hat - now.hat) * sm;
       now.clap += (prm.clap - now.clap) * sm;
+      now.pump += (prm.pump - now.pump) * sm;
       if (!page || beat < page.beat || beat >= page.beat + PAGE) page = pageAt(pages, beat);
       let mel = 0;
       let kickOn = false;
@@ -352,7 +357,9 @@ class FormulSes extends AudioWorkletProcessor {
         clap = 2.5 * v1 * Math.max(burst, tail);
       }
       this.cAge += 1 / sr;
-      const v = (mel * MEL * comp + kick * now.kick + hat * now.hat + clap * now.clap) * this.level;
+      // pompa: kick'in vurduğu an kısılır (başı 4 ms'de iner, tık olmasın), sonra geri gelir; kick yoksa düz
+      const duck = 1 - now.pump * PUMP_DEPTH * Math.exp(-this.kAge / PUMP_TIME) * (1 - Math.exp(-this.kAge / 0.004));
+      const v = (mel * MEL * comp * duck + kick * now.kick + hat * now.hat + clap * now.clap) * this.level;
       // tavan: 0,8'e kadar dokunmaz, üstünü yumuşakça 1'in altında tutar; uç ayarlarda bile ses patlamaz
       const a = Math.abs(v);
       out[i] = a <= 0.8 ? v : Math.sign(v) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2));
