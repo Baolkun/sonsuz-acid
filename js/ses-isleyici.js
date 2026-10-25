@@ -1,17 +1,19 @@
 // Ses işçisi: formülün iki satırı, TikTok'taki gibi iki ayrı ses olarak aynı anda çalar.
 // Melodi satırı: testere dalgası, rezonanslı alçak geçiren filtreden geçer (acid). Perde sıçradığında (yeni nota)
 // filtre açılır ve ~70 ms'de kapanır; aynı nota sürerken ya da perde kayarken açılmaz, ses koyulaşmaya devam eder.
-// Kick satırı: ayrı, temiz bir sinüs; perdesi satırı izleyip ~250 Hz'den köke iner ve satır sürdükçe tok bir bas olarak kalır.
+// Kick satırı: ayrı bir sinüs; perdesi satırı izleyip ~250 Hz'den köke iner. 909'daki gibi başında kısa bir tık var,
+// sesi satır sürerken söner (düz kalıp birden kesilince kutu gibi duyuluyordu) ve hafifçe doyurulur, küçük
+// hoparlörde de duyulsun.
 // Sayılar TikTok sesinden ölçüldü: filtre bölüm birde ~250–470 Hz, bölüm beşte ~600–1000 Hz arasında gidip geliyor.
 // Ekrandaki ses ayarları ('params' iletisi) bu sayıların üstüne çalarken biner; ani değişim tık yapmasın diye yumuşatılır.
 // 303'ten: vurgulu adımda (j = acc) nota daha yüksek, filtre daha açık ve keskin çalar; art arda vurgularda filtre
 // tam kapanmadan yeniden açıldığı için giderek yükselir ("accent sweep"). Dalga testereden kareye kaydırılabilir;
 // yankı tempoya oturur (noktalı sekizlik) ve yalnızca melodiye uygulanır.
-// Hat ve clap satırları: beyaz gürültü. Satır on altılığın başında tanımlıysa vurulur; satırın y'si gürültünün süzüldüğü
-// yeri verir (hat tizde, clap ortada). Hat yüksek geçirenden geçer, açık hat uzun söner ve bir sonraki hat onu keser;
-// clap'in başı birkaç milisaniye arayla üç kez çarpar (eller), ardından kısa bir kuyruk gelir.
+// Hat satırı: 808'deki gibi altı kare dalga (uyumsuz frekanslarda, metalik) ve biraz gürültü, tizi süzülerek. Satır
+// tanımlı olmaya başlayınca vurulur (swing de satırda), şiddeti satırdaki v; açık hat uzun söner, sonraki hat onu keser.
+// Clap satırı: gürültü, ortada süzülür; başı birkaç milisaniye arayla üç kez çarpar (eller), ardından kısa bir kuyruk.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, REF_HZ, KICK_HZ } from './formula.js';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -29,9 +31,15 @@ const MEL = 0.22;
 const KICK = 0.18;
 // ayarların başlangıç değerleri: cut kesimi oktav olarak kaydırır, drive doygunluk, accent vurgu, wave kare payı,
 // echo yankı (hepsi 0 … 1)
+const KICK_DECAY = 0.17; // s: kick'in sönüşü
+const KICK_DRIVE = 1.8; // tanh doygunluğu: üst harmonikler, tok vuruş
+const CLICK = 0.35; // başındaki tık…
+const CLICK_TIME = 0.0015; // …bu sürede söner
 const HAT = 0.18;
 const CLAP = 0.24;
 const HAT_DECAY = [0.022, 0.13]; // s: kapalı, açık
+const METAL = [205.3, 304.4, 369.6, 522.7, 540, 800]; // Hz: 808 hat'inin altı osilatörü
+const METAL_MIX = 0.75; // metal / gürültü
 const HAT_OCT = 3.3; // hat satırının y'sinden kesim: REF_HZ · 2^(y + bu) ≈ 8 kHz
 const CLAP_OCT = 5.2; // clap: ≈ 1,5 kHz
 const CLAP_Q = 0.8; // 1/Q
@@ -93,9 +101,14 @@ class FormulSes extends AudioWorkletProcessor {
     this.kHz = 0;
     this.kAmp = 0;
     this.kOn = false;
+    this.kAge = 1; // s: kick vurulalı
+    this.kc1 = 0; // tık süzgeci
     this.level = 0;
     this.hAge = 1; // s: son hattan beri
     this.hDecay = HAT_DECAY[0];
+    this.hVel = 1;
+    this.hOn = false; // hat satırı az önce tanımlı mıydı
+    this.mPh = new Float64Array(METAL.length);
     this.hG = 0; // hat filtresi
     this.hs1 = 0;
     this.hs2 = 0;
@@ -238,13 +251,16 @@ class FormulSes extends AudioWorkletProcessor {
         mel = (f - hp.k * w1 - w2) * (1 + ACC_GAIN * acc);
 
         // hat ve clap: on altılığa girerken satır tanımlıysa vurulur
-        if (stepIn) {
+        const yh = hatY(sp, x);
+        if (yh !== null && !this.hOn) {
           const h = hatAt(sp, x);
-          if (h && hatY(sp, x) !== null) {
-            this.hAge = 0;
-            this.hDecay = HAT_DECAY[h.open ? 1 : 0];
-            this.hG = Math.tan((Math.PI * Math.min(REF_HZ * 2 ** (hatY(sp, x) + HAT_OCT), 0.45 * sr)) / sr);
-          }
+          this.hAge = 0;
+          this.hVel = h.vel;
+          this.hDecay = HAT_DECAY[h.open ? 1 : 0];
+          this.hG = Math.tan((Math.PI * Math.min(REF_HZ * 2 ** (HAT_Y + 0.3 + HAT_OCT), 0.45 * sr)) / sr);
+        }
+        this.hOn = yh !== null;
+        if (stepIn) {
           if (clapAt(sp, x) && clapY(sp, x) !== null) {
             this.cAge = 0;
             this.cG = Math.tan((Math.PI * REF_HZ * 2 ** (clapY(sp, x) + CLAP_OCT)) / sr);
@@ -254,7 +270,10 @@ class FormulSes extends AudioWorkletProcessor {
         // kick: sinüs sıfırdan başlar, böylece vuruş tık değil tok bir "bum" olur
         const yk = kickY(sp, x);
         if (yk !== null) {
-          if (!this.kOn && this.kAmp < 0.05) this.kPhase = 0;
+          if (!this.kOn) {
+            if (this.kAmp < 0.05) this.kPhase = 0;
+            this.kAge = 0;
+          }
           this.kHz = KICK_HZ * 2 ** yk;
           kickOn = true;
         }
@@ -277,7 +296,9 @@ class FormulSes extends AudioWorkletProcessor {
       this.kAmp += ((kickOn ? 1 : 0) - this.kAmp) * (kickOn ? this.kUp : this.kDown);
       this.kPhase += this.kHz / sr;
       if (this.kPhase >= 1) this.kPhase -= 1;
-      const kick = Math.sin(TAU * this.kPhase) * this.kAmp;
+      const kEnv = 1.2 * this.kAmp * Math.exp(-this.kAge / KICK_DECAY);
+      this.kAge += 1 / sr;
+      let kick = (Math.tanh(KICK_DRIVE * Math.sin(TAU * this.kPhase)) / Math.tanh(KICK_DRIVE)) * kEnv;
       this.level += ((page ? 1 : 0) - this.level) * this.fade;
       // rezonans arttıkça tepe yükselir; ses düzeyi kabaca sabit kalsın (doygunluk tepeyi zaten kırpar)
       const comp = (now.res / RES) ** (0.35 * (1 - now.drive));
@@ -288,18 +309,30 @@ class FormulSes extends AudioWorkletProcessor {
       r ^= r << 5;
       this.seed = r;
       const noise = (r >>> 0) / 2147483648 - 1;
+      // kick'in tığı: gürültünün tizi, birkaç milisaniye
+      if (this.kAge < 10 * CLICK_TIME) {
+        this.kc1 += (noise - this.kc1) * 0.5;
+        kick += CLICK * (noise - this.kc1) * Math.exp(-this.kAge / CLICK_TIME) * this.kAmp;
+      }
       let hat = 0;
+      let metal = 0;
+      for (let k = 0; k < METAL.length; k++) {
+        this.mPh[k] += METAL[k] / sr;
+        if (this.mPh[k] >= 1) this.mPh[k] -= 1;
+        metal += this.mPh[k] < 0.5 ? 1 : -1;
+      }
       if (this.hAge < 8 * this.hDecay) {
+        const src = METAL_MIX * metal / 3 + (1 - METAL_MIX) * noise;
         // iki kutuplu yüksek geçiren (Simper)
         const g = this.hG;
         const a1 = 1 / (1 + g * (g + 1.2));
         const a2 = g * a1;
-        const v3 = noise - this.hs2;
+        const v3 = src - this.hs2;
         const v1 = a1 * this.hs1 + a2 * v3;
         const v2 = this.hs2 + a2 * this.hs1 + g * a2 * v3;
         this.hs1 = 2 * v1 - this.hs1;
         this.hs2 = 2 * v2 - this.hs2;
-        hat = (noise - 1.2 * v1 - v2) * Math.exp(-this.hAge / this.hDecay) * (1 - Math.exp(-this.hAge / 0.0005));
+        hat = 2.8 * this.hVel * (src - 1.2 * v1 - v2) * Math.exp(-this.hAge / this.hDecay) * (1 - Math.exp(-this.hAge / 0.0005));
       }
       this.hAge += 1 / sr;
       let clap = 0;

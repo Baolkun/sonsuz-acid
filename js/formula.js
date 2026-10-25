@@ -103,13 +103,17 @@ export function kickY(sp, x) {
   return u === null ? null : 2.1 * Math.exp(-18 * u) + (sp.base + 12) / 12;
 }
 
-// hi-hat: o on altılık çalıyorsa { open } (açık hat: uzun), yoksa null. Dolgu: sayfanın son vuruşunda her on altılık
+// hi-hat şiddeti dörtlüğün on altılıklarında: ara vuruş güçlü, vuruşun üstü orta, aradakiler kısık (hayalet)
+export const HAT_V = [0.55, 0.35, 1, 0.45];
+// swing: tek on altılıklar (vuruşun ikinci ve dördüncüsü) on altılığın bu kadarı geriden gelir (%56 swing)
+export const SWING = 0.12;
+// hi-hat: o on altılık çalıyorsa { open (açık hat: uzun), vel }, yoksa null. Dolgu: sayfanın son vuruşunda her on altılık
 export function hatAt(sp, x) {
   const h = sp.hat;
   if (!h || x < (h.from ?? -Infinity)) return null;
   const i = mod(Math.floor(4 * x), 4);
-  if (h.roll && x >= 7) return { open: false };
-  return h.on.includes(i) ? { open: h.open.includes(i) } : null;
+  if (h.roll && x >= 7) return { open: false, vel: 0.4 + 0.15 * i }; // dolgu yükselerek gelir
+  return h.on.includes(i) ? { open: h.open.includes(i), vel: HAT_V[i] } : null;
 }
 
 // clap: o on altılıkta çalıyor mu; ölçünün vuruşlarında, "son"da iki ölçüde bir son on altılıkta da
@@ -125,9 +129,9 @@ export const HAT_Y = 2.1;
 export const CLAP_Y = -2.3;
 const GATE = 0.5;
 export function hatY(sp, x) {
-  const u = frac(4 * x);
-  const hit = u < GATE && hatAt(sp, x);
-  return hit ? HAT_Y + 0.3 * Math.exp(-(hit.open ? 8 : 30) * u) : null;
+  const u = frac(4 * x) - SWING * mod(Math.floor(4 * x), 2);
+  const hit = u >= 0 && u < GATE && hatAt(sp, x);
+  return hit ? HAT_Y + 0.3 * hit.vel * Math.exp(-(hit.open ? 8 : 30) * u) : null;
 }
 export function clapY(sp, x) {
   const u = frac(4 * x);
@@ -176,7 +180,7 @@ function hatRow(sp) {
   const i = `⌊4${X}⌋ ${MOD} 4`;
   const lam = h.open.length ? `(30 − 22(${i} ${IN} ${N('hat', setOf(h.open))}))` : '30';
   const on = h.roll ? `(${i} ${IN} ${N('hat', setOf(h.on))} ∨ ${X} ≥ 7)` : `${i} ${IN} ${N('hat', setOf(h.on))}`;
-  return [`${HAT_Y} + 0.3${ex(`−${lam}${FRAC}(4${X})`)}`, `${IF} ${from(h)}${on}, ${FRAC}(4${X}) &lt; ${HALF}`];
+  return [`${HAT_Y} + 0.3${V('v')}${ex(`−${lam}${V('u')}`)}`, `${IF} ${from(h)}${on}, 0 ≤ ${V('u')} &lt; ${HALF}`];
 }
 
 function clapRow(sp) {
@@ -237,6 +241,10 @@ export function renderFormula(sp) {
   if (sp.fill || sp.hocket || (sp.chord && !sp.M)) defs.push(`${V('K')} = ⌊${fr(`4${X} + ${N('q', sp.q, 'q')}`, sp.M ? PHRASE : N('n', sp.n, 'n'))}⌋`);
   if (sp.chord) defs.push(sp.M ? `${V('k')} = ⌊${fr(`${X} + 8`, 4)}⌋` : `${V('k')} = ${V('K')} ${MOD} 4`);
   if (sp.slide) defs.push(`${V('d')}(${V('j')}) = ${degreeExpr(sp)}`, `Δ = ${dj(sp, `${V('j')} − 1`)} − ${dj(sp, V('j'))}`);
+  if (sp.hat) {
+    defs.push(`${V('u')} = ${FRAC}(4${X}) − ${SWING}(⌊4${X}⌋ ${MOD} 2)`);
+    defs.push(`${V('v')} = (${HAT_V.join(', ')})[⌊4${X}⌋ ${MOD} 4]${sp.hat.roll ? ` (${X} ≥ 7: ${V('v')} = 0.4 + 0.15(⌊4${X}⌋ ${MOD} 4))` : ''}`);
+  }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);
   defs.push(`${V('r')} = (${sp.prog.map((d, i) => N('prog', d, `prog.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 4)}⌋]`);
   defs.push(`${V('S')}(${V('m')}) = ⌊${fr(`12${V('m')} + ${N('c', sp.c, 'c')}`, 7)}⌋`);
