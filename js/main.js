@@ -253,6 +253,7 @@ function soundParams() {
     room: num('oda') / 100,
     pad: num('pad') * 0.004, // 0 … 0,4
     hatLen: 2 ** ((num('hatboyu') - 50) / 40), // açık hat kuyruğunun çarpanı: 0,42 … 2,4
+    perk: num('perk') * 0.004, // 0 … 0,4
   };
 }
 
@@ -295,7 +296,7 @@ $('tempo').addEventListener('input', () => {
   while (clocks.length > 1 && clocks[1].time < ctx.currentTime - 3) clocks.shift();
 });
 $('ses').addEventListener('input', () => ses?.setVolume(volume()));
-for (const id of ['filtre', 'rezonans', 'zarf', 'kuyruk', 'vurgu', 'dalga', 'doygunluk', 'yanki', 'kick', 'hat', 'clap', 'pompa', 'oda', 'pad', 'hatboyu']) {
+for (const id of ['filtre', 'rezonans', 'zarf', 'kuyruk', 'vurgu', 'dalga', 'doygunluk', 'yanki', 'kick', 'hat', 'clap', 'pompa', 'oda', 'pad', 'hatboyu', 'perk']) {
   $(id).addEventListener('input', () => ses?.params(soundParams()));
 }
 // eller çevirirken kullanıcı bir sürgüyü tutarsa sürgü onda kalır; bıraktıktan bir süre sonra eller sürdürür
@@ -345,8 +346,8 @@ $('ton').addEventListener('change', () => {
   besteci.settings.key = v === '' ? null : Number(v);
   if (v !== '') liveEdit((s) => { s.base = besteci.keyBase(Number(v)); }, ['base']);
 });
-// hat ve clap deseni: bölüme göre (boş), bir kalıp ya da yok
-for (const id of ['hat', 'clap']) {
+// hat, clap ve ek vurmalı deseni: bölüme göre (boş), bir kalıp ya da yok
+for (const id of ['hat', 'clap', 'perk']) {
   $(`${id}Desen`).addEventListener('change', () => {
     besteci.settings[id] = $(`${id}Desen`).value || null;
     liveEdit(() => {}, [id]);
@@ -483,6 +484,7 @@ st.key = $('ton').value === '' ? null : num('ton');
 st.kick = $('desen').value || null;
 st.hat = $('hatDesen').value || null;
 st.clap = $('clapDesen').value || null;
+st.perk = $('perkDesen').value || null;
 st.stage = $('bolumSec').value === '' ? null : num('bolumSec');
 st.kalip = $('kalip').value || null;
 besteci.s.c = besteci.moodC();

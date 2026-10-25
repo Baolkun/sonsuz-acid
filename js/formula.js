@@ -124,6 +124,18 @@ export function clapAt(sp, x) {
   return (mod(s, 4) === 0 && c.beats.includes(mod(s / 4, 4))) || (c.son && mod(s, 32) === 31);
 }
 
+// ek vurmalı (shaker, rim, tom): m adımlık döngüde (4: her dörtlük, 16: ölçü, 32: iki ölçü) on'daki adımlarda çalar.
+// { ses, vel, k (tom'da kaçıncı vuruş: perde iner) } ya da null. Shaker'da vurgu dörtlüğün ikinci ve dördüncü on altılığında
+export const SHAKER_V = [0.45, 0.85, 0.55, 1];
+export function perkAt(sp, x) {
+  const p = sp.perk;
+  if (!p || x < (p.from ?? -Infinity)) return null;
+  const s = Math.floor(4 * x);
+  const k = p.on.indexOf(mod(s, p.m));
+  if (k < 0) return null;
+  return { ses: p.ses, vel: p.ses === 'shaker' ? SHAKER_V[mod(s, 4)] : 1, k };
+}
+
 // pad: akorun üç notası (dizide kök, üçlü, beşli; i = 0, 1, 2), basın iki oktav üstünde, ölçü boyunca tutulur
 export function padY(sp, x, i) {
   return sp.pad ? (scaleSemi(sp.c, rootAt(sp, x) + 2 * i) + 24 + sp.base) / 12 : null;
@@ -137,6 +149,13 @@ export function hatY(sp, x) {
   const u = frac(4 * x) - SWING * mod(Math.floor(4 * x), 2);
   const hit = u >= 0 && u < GATE && hatAt(sp, x);
   return hit ? HAT_Y + 0.3 * hit.vel * Math.exp(-(hit.open ? 8 : 30) * u) : null;
+}
+// ek vurmalı satırı hat'in altında; söner: shaker orta, rim hızlı, tom yavaş
+export const PERK_Y = 1.75;
+export const PERK_K = { shaker: 18, rim: 40, tom: 6 };
+export function perkY(sp, x) {
+  const u = frac(4 * x) - (sp.perk?.ses === 'shaker' ? SWING * mod(Math.floor(4 * x), 2) : 0);
+  return u >= 0 && u < GATE && perkAt(sp, x) ? PERK_Y + 0.25 * Math.exp(-PERK_K[sp.perk.ses] * u) : null;
 }
 export function clapY(sp, x) {
   const u = frac(4 * x);
@@ -195,6 +214,15 @@ function clapRow(sp) {
   return [`−${-CLAP_Y} + 0.3${ex(`−12${FRAC}(4${X})`)}`, `${IF} ${from(c)}${on}, ${FRAC}(4${X}) &lt; ${HALF}`];
 }
 
+function perkRow(sp) {
+  const p = sp.perk;
+  const sh = p.ses === 'shaker';
+  const u = sh ? V('u') : `${FRAC}(4${X})`;
+  const all = p.m === 4 && p.on.length === 4;
+  const on = all ? '' : `⌊4${X}⌋ ${MOD} ${p.m} ${IN} ${N('perk', setOf(p.on))}, `;
+  return [`${PERK_Y} + 0.25${ex(`−${PERK_K[p.ses]}${u}`)}`, `${IF} ${from(p)}${on}${sh ? `0 ≤ ${u}` : u} &lt; ${HALF} <span class="op">(${p.ses})</span>`];
+}
+
 // dolgu ve hoketin ortak parçası: (uK + j + v) mod F
 const walk = (key, u, v, sp, r = '') => `(${r}${N(key, u, `${key}.u`)}${V('K')} + ${V('j')} + ${N(key, v, `${key}.v`)}) ${MOD} ${N('F', sp.F, 'F')}`;
 
@@ -239,7 +267,7 @@ export function renderFormula(sp) {
   if (sp.hocket) mel = brace([[hocketPart(sp), `${IF} ${V('j')} ${MOD} 3 &gt; 0`], [mel]]);
   mel += extras(sp);
   const pad = sp.pad && [fr(`${V('S')}(${V('r')} + 2${V('i')}) + ${N('pad', 24)} − ${N('base', -sp.base, 'base')}`, 12), `${V('i')} ${IN} {0, 1, 2}`];
-  const rows = [sp.kick && kickRow(sp), sp.hat && hatRow(sp), sp.clap && clapRow(sp), pad].filter(Boolean);
+  const rows = [sp.kick && kickRow(sp), sp.hat && hatRow(sp), sp.perk && perkRow(sp), sp.clap && clapRow(sp), pad].filter(Boolean);
   const main = rows.length ? brace([...rows, [mel]]) : mel;
   const defs = sp.M
     ? [`${V('b')} = ⌊4${X}⌋ ${MOD} ${N('M', sp.M, 'M')}`, `${V('j')} = (${V('b')} + ${N('p', sp.p, 'p')}) ${MOD} ${N('n', sp.n, 'n')}`]
@@ -247,8 +275,8 @@ export function renderFormula(sp) {
   if (sp.fill || sp.hocket || (sp.chord && !sp.M)) defs.push(`${V('K')} = ⌊${fr(`4${X} + ${N('q', sp.q, 'q')}`, sp.M ? PHRASE : N('n', sp.n, 'n'))}⌋`);
   if (sp.chord) defs.push(sp.M ? `${V('k')} = ⌊${fr(`${X} + 8`, 4)}⌋` : `${V('k')} = ${V('K')} ${MOD} 4`);
   if (sp.slide) defs.push(`${V('d')}(${V('j')}) = ${degreeExpr(sp)}`, `Δ = ${dj(sp, `${V('j')} − 1`)} − ${dj(sp, V('j'))}`);
+  if (sp.hat || sp.perk?.ses === 'shaker') defs.push(`${V('u')} = ${FRAC}(4${X}) − ${SWING}(⌊4${X}⌋ ${MOD} 2)`);
   if (sp.hat) {
-    defs.push(`${V('u')} = ${FRAC}(4${X}) − ${SWING}(⌊4${X}⌋ ${MOD} 2)`);
     defs.push(`${V('v')} = (${HAT_V.join(', ')})[⌊4${X}⌋ ${MOD} 4]${sp.hat.roll ? ` (${X} ≥ 7: ${V('v')} = 0.4 + 0.15(⌊4${X}⌋ ${MOD} 4))` : ''}`);
   }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);

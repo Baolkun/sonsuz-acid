@@ -37,7 +37,6 @@
     color: var(--murekkep);
     border-radius: 2px;
     background-color: var(--kagit);
-    transition: background-color 1.5s ease;
     background-image:
       linear-gradient(180deg, rgba(255, 255, 225, .18), rgba(255, 255, 225, 0) 45%, rgba(60, 80, 0, .12) 45.6%, rgba(60, 80, 0, 0) 64%),
       url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='640'><filter id='k' x='0' y='0' width='100%' height='100%'><feTurbulence type='turbulence' baseFrequency='.0032 .0042' numOctaves='4' seed='23' stitchTiles='stitch'/><feDiffuseLighting lighting-color='white' surfaceScale='5' diffuseConstant='1.2'><feDistantLight azimuth='225' elevation='55'/></feDiffuseLighting></filter><rect width='900' height='640' filter='url(%23k)'/></svg>");
@@ -227,6 +226,17 @@
           <option value="geri">2 ve 4</option>
           <option value="son">2 ve 4 + ön vuruş</option>
           <option value="dort">yalnız 4</option>
+          <option value="none">yok</option>
+        </select></label>
+        <label class="ayar"><span>Perküsyon</span><input id="perk" type="range" min="0" max="100" value="50"><output></output></label>
+        <label class="ayar" title="Ek vurmalı: shaker, rimshot ya da tom. Bölüme göre: dördüncü bölümde rim ya da tom girer, kırılmada kick susunca shaker ritmi taşır"><span>Perküsyon deseni</span><select id="perkDesen">
+          <option value="" selected>bölüme göre</option>
+          <option value="shaker">shaker</option>
+          <option value="shakerAra">shaker (ara)</option>
+          <option value="rim">rim 3+3+5</option>
+          <option value="rimSeyrek">rim seyrek</option>
+          <option value="tom">tom (cümle sonu)</option>
+          <option value="tomIki">tom (yarım ölçü)</option>
           <option value="none">yok</option>
         </select></label>
         <label class="ayar" title="Videodaki altı bölümden birinde kalabilirsin"><span>Bölüm</span><select id="bolumSec">

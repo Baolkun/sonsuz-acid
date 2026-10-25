@@ -54,6 +54,18 @@ export const CLAPLAR = {
   son: { ad: '2 ve 4 + ön vuruş', beats: [1, 3], son: true, w: 2 },
   dort: { ad: 'yalnız 4', beats: [3], son: false, w: 1 },
 };
+// Ek vurmalı kalıpları: m adımlık döngüde (4: her dörtlük, 16: ölçü, 32: iki ölçü) hangi on altılıklarda çalar.
+// kat 1 shaker (kırılmada kick yokken ritmi taşır), kat 2 rim ve tom (yoğun bölümler): rim kick'in arasına senkoplu
+// düşer, tom iki ölçünün sonunda inerek cümleyi bağlar
+export const PERKLER = {
+  shaker: { ad: 'shaker', ses: 'shaker', m: 4, on: [0, 1, 2, 3], kat: 1, w: 3 },
+  shakerAra: { ad: 'shaker (ara)', ses: 'shaker', m: 4, on: [1, 3], kat: 1, w: 2 },
+  rim: { ad: 'rim 3+3+5', ses: 'rim', m: 16, on: [3, 6, 11, 14], kat: 2, w: 3 },
+  rimSeyrek: { ad: 'rim seyrek', ses: 'rim', m: 16, on: [6, 13], kat: 2, w: 2 },
+  tom: { ad: 'tom (cümle sonu)', ses: 'tom', m: 32, on: [26, 29, 30], kat: 2, w: 2 },
+  tomIki: { ad: 'tom (yarım ölçü)', ses: 'tom', m: 16, on: [10, 14], kat: 2, w: 1 },
+};
+const perkIds = (kat) => Object.keys(PERKLER).filter((id) => PERKLER[id].kat === kat);
 // ağırlığa göre seçer; not: seçilmeyecek olan
 function weighted(rng, table, ids, not) {
   const pool = ids.filter((id) => id !== not);
@@ -76,6 +88,8 @@ function features(stage, density) {
     hat: [0, 1, 1, 2, 2, 2, 1][stage], clap: stage >= 2 && stage !== 6,
     // arkada akorlar üçüncü bölümde girer; kırılmada öne çıkar
     pad: [0, 0, 1, 1, 1, 1, 1.8][stage],
+    // ek vurmalı dördüncü bölümde girer (rim ya da tom); kırılmada shaker
+    perk: [0, 0, 0, 2, 2, 2, 1][stage],
   };
   if (stage === 0) {
     f.kick = 'bar';
@@ -103,7 +117,7 @@ export class Besteci {
   constructor(seed) {
     this.rng = createRng(seed);
     // kullanıcının ayarları; stage, kick ve key null ise besteci kendisi seçer
-    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null };
+    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null };
     this.locked = false;
     this.newWanted = false;
     this.no = 0; // kaçıncı sayfa
@@ -116,7 +130,7 @@ export class Besteci {
     this.s = {
       kalip: 'video', M: null, n: 5, p: 2, q: 32, acc: 2, bend: 4, slide: null, base: -18, c: 2, prog: [0, 0, 0, 0],
       fill: { u: 3, v: 6 }, hocket: { u: 3, v: 1, chirp: 0.4 }, kick: { at: 4, L: 4 }, lift: 6, riser: 3, blip: 0.25,
-      hat: ['ara', 'onalti'], clap: 'geri', enter: {}, roll: false,
+      hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false,
     };
   }
 
@@ -209,8 +223,9 @@ export class Besteci {
     s.hocket = { u: rng.pick([1, 2, 3]), v: rng.int(0, 6), chirp: rng.pick([0.2, 0.3, 0.4]) };
     s.hat = [weighted(rng, HATLAR, hatIds(1), s.hat[0]), weighted(rng, HATLAR, hatIds(2), s.hat[1])];
     s.clap = weighted(rng, CLAPLAR, Object.keys(CLAPLAR), s.clap);
+    s.perk = [weighted(rng, PERKLER, perkIds(1), s.perk[0]), weighted(rng, PERKLER, perkIds(2), s.perk[1])];
     s.riser = rng.pick([3, 4]); // yükseliş: her kaç vuruşta bir basamak (3: iki basamak, 4: son ölçüde bir); daha sık olursa tavanı aşar
-    for (const k of ['base', 'c', 'M', 'n', 'p', 'acc', 'bend', 'slide', 'prog', 'fill', 'hocket', 'hat', 'clap']) changed.add(k);
+    for (const k of ['base', 'c', 'M', 'n', 'p', 'acc', 'bend', 'slide', 'prog', 'fill', 'hocket', 'hat', 'clap', 'perk']) changed.add(k);
     // altı bölüm; ikisi tekrar edip değişerek uzar
     const order = [0, 1, 2, 3, 4, 5];
     for (const e of rng.shuffle(settings.density > 0.5 ? [2, 3, 4] : [1, 2, 4]).slice(0, 2)) order.splice(order.indexOf(e) + 1, 0, e);
@@ -232,6 +247,7 @@ export class Besteci {
     if (kin.length) keys.push('kalip');
     if (f.hat && !settings.hat) keys.push('hat');
     if (f.clap && !settings.clap && s.clap !== 'dort') keys.push('clap');
+    if (f.perk && !settings.perk) keys.push('perk');
     const k = rng.pick(keys);
     if (k === 'slide') s.slide = s.M && s.slide !== null && rng.chance(0.25) ? null : this.slideStep(s, s.slide) ?? s.slide;
     if (k === 'bend') s.bend = s.bend !== null && rng.chance(0.3) ? null : this.bendStep(s, s.bend) ?? s.bend;
@@ -241,6 +257,7 @@ export class Besteci {
     // hat kardeşine geçer (aynı kat), clap ön vuruşu alır ya da bırakır
     if (k === 'hat') s.hat = s.hat.map((id, i) => (i === f.hat - 1 ? weighted(rng, HATLAR, hatIds(f.hat), id) : id));
     if (k === 'clap') s.clap = s.clap === 'son' ? 'geri' : 'son';
+    if (k === 'perk') s.perk = s.perk.map((id, i) => (i === f.perk - 1 ? weighted(rng, PERKLER, perkIds(f.perk), id) : id));
     if (k === 'kalip') {
       const id = rng.pick(kin);
       s.kalip = id;
@@ -282,6 +299,7 @@ export class Besteci {
     // yarısında başlar; kick susunca clap da susar (kırılma), hat sürer
     const H = HATLAR[st.hat ?? (f.hat ? s.hat[f.hat - 1] : null)];
     const C = CLAPLAR[st.clap ?? (f.clap && kick ? s.clap : null)];
+    const P = PERKLER[st.perk ?? (f.perk ? s.perk[f.perk - 1] : null)];
     const enter = (key) => (!st[key] && s.enter?.[key] ? 0 : null);
     return {
       kick, M: s.M, n: s.n, p: s.p, q: s.q, acc: s.acc, bend: s.bend, slide, base: s.base, c: s.c, F: st.F, prog: s.prog.slice(),
@@ -289,6 +307,7 @@ export class Besteci {
       blip: f.blip ? s.blip : 0, oct, riser: f.riser ? { w: s.riser } : null, lift: f.lift ? s.lift : null,
       hat: H ? { on: H.on.slice(), open: H.open.slice(), from: enter('hat'), roll: !!s.roll } : null,
       clap: C ? { beats: C.beats.slice(), son: C.son, from: enter('clap') } : null,
+      perk: P ? { ses: P.ses, m: P.m, on: P.on.slice(), from: enter('perk') } : null,
       gap: !!s.gap,
       pad: f.pad ? { lvl: f.pad } : null,
     };
@@ -308,6 +327,7 @@ export class Besteci {
     page.kalip = k && k.n === s.n && k.M === s.M && k.p === s.p ? k.ad : null;
     page.hat = page.sp.hat ? HATLAR[this.settings.hat ?? s.hat[features(stage, this.settings.density).hat - 1]]?.ad ?? null : null;
     page.clap = page.sp.clap ? CLAPLAR[this.settings.clap ?? s.clap].ad : null;
+    page.perk = page.sp.perk ? PERKLER[this.settings.perk ?? s.perk[features(stage, this.settings.density).perk - 1]]?.ad ?? null : null;
   }
 
   next() {
@@ -328,8 +348,11 @@ export class Besteci {
     s.drop = settings.stage === null && !fresh && prev?.eff === 5 && eff === 4;
     s.gap = settings.stage === null && eff === 5 && after === 4;
     // yeni giren hat ya da clap sayfanın ikinci yarısında başlar
-    s.enter = { hat: f.hat > 0 && !(prev && !fresh && prev.f.hat), clap: f.clap && !(prev && !fresh && prev.f.clap) };
-    if (this.at === 0) s.enter = { hat: false, clap: false }; // yolculuk başında hepsi birden: düşüş
+    s.enter = {
+      hat: f.hat > 0 && !(prev && !fresh && prev.f.hat), clap: f.clap && !(prev && !fresh && prev.f.clap),
+      perk: f.perk > 0 && !(prev && !fresh && prev.f.perk === f.perk),
+    };
+    if (this.at === 0) s.enter = { hat: false, clap: false, perk: false }; // yolculuk başında hepsi birden: düşüş
     if (!fresh && prev) {
       // çeşitleme sekiz ölçülük cümlenin ikinci yarısında: aynı bölümün ikinci (dördüncü …) sayfasında. Bölüm
       // değişirken yeni terim zaten giriyor, desen yalnızca Değişim çok açıksa oynar; sıfırda hiç oynamaz
@@ -339,6 +362,7 @@ export class Besteci {
       for (const key of ['fill', 'hocket', 'blip', 'oct', 'riser', 'lift']) if (f[key] && !prev.f[key]) changed.add(key);
       if (f.hat !== prev.f.hat) changed.add('hat');
       if (f.clap !== prev.f.clap) changed.add('clap');
+      if (f.perk !== prev.f.perk) changed.add('perk');
       if (f.pad && !prev.f.pad) changed.add('pad');
       if (f.chord && !prev.f.chord) changed.add('acc');
     }

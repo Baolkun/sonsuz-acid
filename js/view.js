@@ -1,7 +1,7 @@
 // Grafik: TikTok'taki gibi buruşuk limon yeşili kâğıtta formülün satırları: üstte hat ve kick, ortada melodi, altta clap.
 // Her sayfa x = −8'de başlar; kalemler (kırmızı noktalar) ilerledikçe eğriler çizilir, sayfa bitince kâğıt temizlenir.
 
-import { kickY, melodyY, hatY, clapY, padY } from './formula.js';
+import { kickY, melodyY, hatY, clapY, padY, perkY } from './formula.js';
 
 const X_MIN = -10.5;
 const X_MAX = 11.5;
@@ -51,7 +51,7 @@ export class View {
     const { sp } = page;
     // drop öncesi boşlukta (son yarım vuruş) satırlar tanımsız
     const pads = [0, 1, 2].map((i) => (s, v) => padY(s, v, i));
-    const rows = [melodyY, kickY, hatY, clapY, ...pads].map((f) => (v) => (sp.gap && v >= 7.5 ? null : f(sp, v)));
+    const rows = [melodyY, kickY, hatY, perkY, clapY, ...pads].map((f) => (v) => (sp.gap && v >= 7.5 ? null : f(sp, v)));
     for (const row of rows) this.curve(row, end, X, Y);
     g.fillStyle = RED;
     for (const row of rows) {
