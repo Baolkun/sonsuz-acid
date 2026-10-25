@@ -14,7 +14,7 @@ function squeeze(ctx) {
 
 export class Ses {
   static async create(ctx) {
-    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=a70e78a4', import.meta.url));
+    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=cff0f524', import.meta.url));
     return new Ses(ctx);
   }
 
@@ -55,6 +55,57 @@ export class Ses {
       this.node.connect(g).connect(squeeze(this.ctx)).connect(this.rec);
     }
     return this.rec.stream;
+  }
+
+  // WAV kaydı: video kaydıyla aynı kol (ses sürgüsünden bağımsız)
+  wavStart() {
+    const g = this.ctx.createGain();
+    g.gain.value = 0.75 ** 2;
+    const k = new AudioWorkletNode(this.ctx, 'kaydedici');
+    const parts = [];
+    const done = new Promise((ok) => {
+      k.port.onmessage = ({ data }) => (data ? parts.push(data) : ok());
+    });
+    this.node.connect(g).connect(squeeze(this.ctx)).connect(k).connect(this.ctx.destination);
+    this.wav = { g, k, parts, done, t0: this.ctx.currentTime };
+  }
+
+  // kaydı bitirir; 16 bit tek kanal WAV
+  async wavStop() {
+    const { g, k, parts, done } = this.wav;
+    this.wav = null;
+    k.port.postMessage('dur');
+    await done;
+    this.node.disconnect(g);
+    k.disconnect();
+    const n = parts.reduce((a, p) => a + p.length, 0);
+    const sr = this.ctx.sampleRate;
+    const v = new DataView(new ArrayBuffer(44 + 2 * n));
+    const str = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    str(0, 'RIFF');
+    v.setUint32(4, 36 + 2 * n, true);
+    str(8, 'WAVEfmt ');
+    v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true);
+    v.setUint32(28, 2 * sr, true);
+    v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true);
+    str(36, 'data');
+    v.setUint32(40, 2 * n, true);
+    let o = 44;
+    for (const p of parts) {
+      for (const x of p) {
+        v.setInt16(o, Math.round(32767 * Math.max(-1, Math.min(1, x))), true);
+        o += 2;
+      }
+    }
+    return new Blob([v], { type: 'audio/wav' });
+  }
+
+  get wavSeconds() {
+    return this.wav ? this.ctx.currentTime - this.wav.t0 : 0;
   }
 
   clock(c) {

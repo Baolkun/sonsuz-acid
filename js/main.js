@@ -3,19 +3,23 @@
 // sonraki sayfalar da oradan devam eder. "Kendi çeviriyor" açıkken acid ayarlarını eller çevirir (eller.js).
 // Ayarlar tarayıcıda saklanır.
 
-import { Besteci, PAGE, slideK } from './besteci.js?v=94f47592';
-import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js?v=d1dc6594';
+import { Besteci, PAGE, slideK } from './besteci.js?v=f9abc5ad';
+import { Eller, KNOBS, RENKLER, TINILAR, seedEller } from './eller.js?v=2aa49873';
 import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=cc1b4452';
-import { Ses } from './ses.js?v=333b6de1';
-import { View } from './view.js?v=1111d727';
-import { Kayit } from './kayit.js?v=7137f7d5';
-import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=6f4b77e2';
+import { Ses } from './ses.js?v=c739ac9b';
+import { View } from './view.js?v=7c7ab37b';
+import { Kayit } from './kayit.js?v=6e29ad8f';
+import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=bc423345';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
 const $ = (id) => document.getElementById(id);
 const num = (id) => Number($(id).value);
-const besteci = new Besteci((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
+// tohum: aynı tohum ve ayarlarla aynı şarkı başlar (?tohum= paylaşılan bağlantıdan)
+const URLQ = new URLSearchParams(location.search);
+const tohum = Number(URLQ.get('tohum')) >>> 0 || (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
+const besteci = new Besteci(tohum);
+seedEller(tohum);
 const view = new View($('grafik'));
 const eller = new Eller();
 const kayit = new Kayit(document.querySelector('.kagit'));
@@ -37,14 +41,58 @@ function beatAt(t) {
   return c.beat + ((t - c.time) * c.bpm) / 60;
 }
 
+// saat ekler; ondan sonraya kurulmuş saatler (eski tempo geçişi) atılır
+function addClock(c) {
+  while (clocks.length > 1 && clocks[clocks.length - 1].time >= c.time) clocks.pop();
+  clocks.push(c);
+  ses.clock(c);
+}
+// vuruşun zamanı (saatlerin sonuncusundan)
+function timeAt(beat) {
+  let c = clocks[0];
+  for (const k of clocks) if (k.beat <= beat) c = k;
+  return c.time + ((beat - c.beat) * 60) / c.bpm;
+}
+// DJ setinde türün temposu (Amen'in kendi temposu yok: kaydın 165'i; tür yokken techno)
+const DJ_TEMPO = { amen: 165, techno: 140 };
+const djTempo = (tur) => TURLER[tur]?.tempo || DJ_TEMPO[tur ?? 'techno'];
+let rampAt = null; // tempo geçişinin kurulduğu sayfanın vuruşu
+// DJ seti: tür değişen sayfa boyunca tempo yeni türünkine kayar (dört ölçüde, yumuşak), DJ'in pitch'i itmesi gibi
+function djRamp(page, prev) {
+  if (!besteci.settings.dj || !prev || page.tur === prev.tur || rampAt === page.beat) return;
+  rampAt = page.beat;
+  // sayfa çalmaya başladıysa (yeni yolculuk elle) geçiş şimdiden sayfa sonuna
+  const b0 = Math.max(page.beat, Math.ceil(beatAt(ctx.currentTime + 0.1)));
+  const from = clocks.findLast((c) => c.beat <= b0)?.bpm ?? bpm;
+  const to = djTempo(page.tur);
+  if (from === to) return;
+  const L = page.beat + PAGE - b0;
+  for (let b = b0; b <= page.beat + PAGE; b++) {
+    const u = L > 0 ? (b - b0) / L : 1;
+    addClock({ time: timeAt(b), beat: b, bpm: Math.round(10 * (from + (to - from) * (0.5 - 0.5 * Math.cos(Math.PI * u)))) / 10 });
+  }
+}
+// tempo sürgüsü çalan saati gösterir (DJ geçişinde kayar)
+function followTempo() {
+  const c = clocks.findLast((k) => k.time <= ctx.currentTime);
+  if (!c || Math.round(c.bpm) === bpm) return;
+  bpm = Math.round(c.bpm);
+  $('tempo').value = bpm;
+  showValue($('tempo'));
+  if (shown) showInfo(shown);
+}
+
 function compose() {
   if (!playing) return;
   const now = beatAt(ctx.currentTime);
   while (!pages.length || pages[pages.length - 1].beat + PAGE < now + LEAD) {
     const page = besteci.next();
+    const prev = pages[pages.length - 1];
     pages.push(page);
     ses.page(page);
+    djRamp(page, prev);
   }
+  if (besteci.settings.dj) followTempo();
   // ekran sesten biraz geride kalır; bitmiş sayfayı bir vuruş sonra at
   while (pages.length > 1 && pages[1].beat < now - 1) pages.shift();
 }
@@ -158,6 +206,8 @@ function newJourney() {
   const page = besteci.next();
   pages.push(page);
   ses.page(page);
+  rampAt = null;
+  djRamp(page, cur);
   compose();
 }
 
@@ -203,6 +253,8 @@ function showInfo(page) {
   if (oto && renk) document.querySelector('.kagit').style.setProperty('--kagit', RENKLER[renk].kagit);
   else document.querySelector('.kagit').style.removeProperty('--kagit');
   $('bilgi').textContent = infoLine(page, looks());
+  // DJ setinde seçimde çalan tür yazar
+  if (besteci.settings.dj) $('amen').querySelector('option[value="dj"]').textContent = `${t('DJ seti')} · ${page.tur ? TURLER[page.tur].ad : 'techno'}`;
 }
 
 function showPage(page) {
@@ -363,6 +415,8 @@ function applyLang() {
   $('cal').textContent = t(playing ? '❚❚ Durdur' : '▶ Çal');
   $('oto').textContent = t(oto ? 'Kendi çeviriyor' : 'Kendi çevirsin');
   if (!kayit.active) $('kayitBtn').textContent = t('● Video kaydet');
+  if (!ses?.wav) $('wavBtn').textContent = t('● WAV kaydet');
+  $('paylas').textContent = t('Paylaş');
   for (const el of controls) if (el.type === 'range') showValue(el);
   if (shown) showPage(shown);
 }
@@ -385,6 +439,60 @@ $('kayitBtn').addEventListener('click', async () => {
   kayit.start(ses.stream());
   btn.setAttribute('aria-pressed', 'true');
 });
+// paylaş: bu şarkının bağlantısı (tohum + varsayılandan farklı ayarlar) panoya; açan aynı şarkıyı baştan duyar
+function shareLink() {
+  const q = new URLSearchParams({ tohum });
+  for (const el of controls) {
+    if (['ses', 'dil', 'kayitDil'].includes(el.id)) continue;
+    const v = oto && el.id in KNOBS ? String(eller.home[el.id] ?? el.value) : el.value;
+    const d = el.tagName === 'SELECT' ? ([...el.options].find((o) => o.defaultSelected) ?? el.options[0]).value : el.defaultValue;
+    if (v !== d) q.set(el.id, v);
+  }
+  if (!oto) q.set('oto', '0');
+  return `${location.origin}${location.pathname}?${q}`;
+}
+$('paylas').addEventListener('click', async () => {
+  const url = shareLink();
+  const btn = $('paylas');
+  try {
+    await navigator.clipboard.writeText(url);
+    btn.textContent = t('Kopyalandı ✓');
+  } catch {
+    prompt(t('Bağlantı'), url);
+  }
+  setTimeout(() => { btn.textContent = t('Paylaş'); }, 1800);
+});
+// WAV: çalmıyorsa çalmaya da başlar; ikinci basış kaydı bitirip dosyayı indirir
+let wavTimer = null;
+$('wavBtn').addEventListener('click', async () => {
+  if (busy) return;
+  const btn = $('wavBtn');
+  if (ses?.wav) {
+    clearInterval(wavTimer);
+    const blob = await ses.wavStop();
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = t('● WAV kaydet');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const tur = besteci.tur(liveState());
+    const d = new Date();
+    const z = (n) => String(n).padStart(2, '0');
+    a.download = `sonsuz-acid-${tur ?? 'techno'}-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.wav`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    return;
+  }
+  if (!playing) await toggle();
+  ses.wavStart();
+  btn.setAttribute('aria-pressed', 'true');
+  const tick = () => {
+    const s = Math.floor(ses.wavSeconds);
+    btn.textContent = `■ ${t('Bitir')} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+  tick();
+  wavTimer = setInterval(tick, 500);
+});
+
 $('tempo').addEventListener('input', () => {
   bpm = num('tempo');
   if (shown) showInfo(shown);
@@ -392,9 +500,7 @@ $('tempo').addEventListener('input', () => {
   if (!ctx) return;
   // yeni hız, şimdiki vuruştan kopmadan biraz sonra devreye girer
   const time = ctx.currentTime + 0.05;
-  const c = { time, beat: beatAt(time), bpm };
-  clocks.push(c);
-  ses.clock(c);
+  addClock({ time, beat: beatAt(time), bpm });
   while (clocks.length > 1 && clocks[1].time < ctx.currentTime - 3) clocks.shift();
 });
 $('ses').addEventListener('input', () => ses?.setVolume(volume()));
@@ -472,8 +578,20 @@ $('kalip').addEventListener('change', () => {
   if (id) liveEdit((s) => besteci.useKalip(s, id), ['M', 'n', 'p', 'acc', 'bend', 'slide']);
 });
 // tür seçilince çalan sayfa hemen o türün davuluyla yeniden yazılır; doğranan türde besteci doğramayı kendi seçer
+// DJ seti: tür kendiliğinden komşu türlere geçer; çalan türle başlar
+function setTur(v) {
+  const st = besteci.settings;
+  const was = besteci.tur(liveState());
+  st.dj = v === 'dj';
+  st.amen = st.dj ? null : v || null;
+  if (st.dj) {
+    liveEdit((s) => { s.tur = was; s.djN = 0; });
+    $('amen').querySelector('option[value="dj"]').textContent = t('DJ seti');
+  }
+}
 $('amen').addEventListener('change', () => {
-  besteci.settings.amen = $('amen').value || null;
+  setTur($('amen').value);
+  if (besteci.settings.dj) return;
   liveEdit((s) => besteci.useDograma(s), ['amen']);
   // her tür kendi temposunda çalar (sonra elle değiştirilebilir)
   const T = TURLER[besteci.settings.amen];
@@ -598,6 +716,11 @@ box.addEventListener('keydown', (e) => {
 // ---------- başlangıç ----------
 
 load();
+// paylaşılan bağlantı: içindeki ayarlar kayıtlı olanların üstüne biner
+if (URLQ.has('tohum')) {
+  for (const el of controls) if (URLQ.has(el.id)) el.value = URLQ.get(el.id);
+  if (URLQ.get('oto') === '0') oto = false;
+}
 // kayıtlı dil yoksa tarayıcının dili: Türkçe değilse İngilizce
 const saved = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } })();
 if (!saved.dil) $('dil').value = (navigator.language || '').startsWith('tr') ? 'tr' : 'en';
@@ -625,7 +748,7 @@ st.sarki = $('sarki').value || null;
 // ?break=core, ?break=gabber … (ya da ?tur=) adresi o türle ve temposuyla açar
 const breakQ = new URLSearchParams(location.search).get('break') ?? new URLSearchParams(location.search).get('tur');
 if (breakQ && [...$('amen').options].some((o) => o.value === breakQ)) $('amen').value = breakQ;
-st.amen = $('amen').value || null;
+setTur($('amen').value);
 if (breakQ === st.amen && TURLER[st.amen]?.tempo) {
   $('tempo').value = TURLER[st.amen].tempo;
   showValue($('tempo'));

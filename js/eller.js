@@ -25,6 +25,8 @@
 // Sürgüler kullanıcının yerleştirdiği yerin ("ev") çevresinde gezinir. Kullanıcı bir sürgüyü tutarsa sürgü
 // bırakıldıktan sonra da bir süre onda kalır, sonra hareket yavaşça geri gelir; yeni ev bırakıldığı yerdir.
 
+import { createRng } from './rng.js?v=baee4ba4';
+
 export const KNOBS = {
   filtre: [-100, 100], rezonans: [0, 100], zarf: [0, 100], kuyruk: [0, 100], vurgu: [0, 100], doygunluk: [0, 100], yanki: [0, 100],
   pompa: [0, 100], oda: [0, 100], pad: [0, 100], hat: [0, 100], hatboyu: [0, 100], perk: [0, 100],
@@ -59,7 +61,10 @@ const PUSH = new Set(['son', 'yukselis']); // ardından ilk vuruşta geri inilir
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const ease = (t) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(t, 0, 1));
-const rand = (a, b) => a + Math.random() * (b - a);
+// rastgele sapmalar tohumlu: paylaşılan bağlantı aynı çevirmeyle başlar
+let rnd = Math.random;
+export const seedEller = (seed) => { rnd = createRng(seed).next; };
+const rand = (a, b) => a + rnd() * (b - a);
 const jit = (d) => rand(-d, d);
 const breath = (u, P) => Math.sin((Math.PI * u) / P) ** 2; // nefes: ölçü başında 0, ortasında (P = 8: ikinci ölçüde) 1
 const stairs = (u) => Math.min(1, (Math.floor(u / 4) + ease(2 * (u % 4))) / 4); // her ölçü başında yarım vuruşta bir basamak
@@ -83,7 +88,7 @@ export class Eller {
   pickRenk(e, table = RENKLER, prev = this.renk) {
     const ids = Object.keys(table).filter((id) => id !== prev);
     const w = ids.map((id) => Math.exp(-((table[id].e - e) ** 2) / 0.08));
-    let x = Math.random() * w.reduce((a, b) => a + b);
+    let x = rnd() * w.reduce((a, b) => a + b);
     for (let i = 0; i < ids.length; i++) if ((x -= w[i]) < 0) return ids[i];
     return ids[ids.length - 1];
   }
@@ -162,7 +167,7 @@ export class Eller {
     const vurgu = -15 + 30 * e + jit(3);
     const doy = Math.max(0, 50 * (e - 0.45)) - (quiet ? 30 : 0) + jit(3);
     // yankı cümle sonunda fırlatılır: yolculuk biterken çoğu zaman, bölüm değişirken ya da sekiz ölçülük cümle biterken arada bir
-    const toss = Math.random() < (next === null ? 0.75 : change ? 0.4 : variant % 2 ? 0.25 : 0) ? rand(30, 40) : 0;
+    const toss = rnd() < (next === null ? 0.75 : change ? 0.4 : variant % 2 ? 0.25 : 0) ? rand(30, 40) : 0;
     // doku: bölümün tabanı + sayfanın rengi
     const renk = (this.renk = this.pickRenk(e));
     const R = RENKLER[renk];

@@ -94,6 +94,23 @@ export const DOGRAMALAR = [
   { sig: [0, 1, 2, 3, 4, 5, 6, 3], rho: [16, 16, 16, 16, 16, 16, 16, 8] },
   { sig: [0, 1, 4, 5, 0, 1, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
 ];
+// DJ seti: tür iki yolculukta bir komşu türe geçer, DJ'lerin miksledikleri gibi (tempoları yakın, davulu akraba):
+// techno'dan Amen'e, jungle'dan drum & bass'e, breakcore'dan speedcore'a, happy hardcore'dan gabber'a. null: tür yok (acid techno)
+export const DJ_YOL = {
+  techno: ['amen', 'footwork', 'happy'],
+  amen: ['jungle', 'dnb', 'techno'],
+  jungle: ['amen', 'dnb', 'core'],
+  dnb: ['jungle', 'footwork', 'amen'],
+  footwork: ['dnb', 'jungle', 'techno'],
+  core: ['jungle', 'math', 'speed', 'french'],
+  math: ['core', 'jungle'],
+  happy: ['gabber', 'french', 'techno'],
+  gabber: ['happy', 'french', 'terror'],
+  french: ['gabber', 'terror', 'core'],
+  terror: ['gabber', 'speed', 'french'],
+  speed: ['terror', 'core'],
+};
+export const DJ_TUR_YOLCULUK = 2; // tür kaç yolculukta bir değişir
 export const AMEN_DUZ = { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] };
 export const RHO = [16, 8, 4, 2, 1];
 // şarkının bir sayfası: T her sekizliğin basamağı (32), A notanın başladığı sekizliklerden yeniden vurulanlar (ölçü başı ya
@@ -163,7 +180,7 @@ export class Besteci {
   constructor(seed) {
     this.rng = createRng(seed);
     // kullanıcının ayarları; stage, kick ve key null ise besteci kendisi seçer
-    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null, amen: null, glitch: 0.4 };
+    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null, amen: null, glitch: 0.4, dj: false };
     this.locked = false;
     this.newWanted = false;
     this.wantRoll = false; // elle istenen dolgu: sonraki sayfada
@@ -178,7 +195,7 @@ export class Besteci {
       kalip: 'video', M: null, n: 5, p: 2, q: 32, acc: 2, bend: 4, slide: null, base: -18, c: 2, prog: [0, 0, 0, 0],
       fill: { u: 3, v: 6 }, hocket: { u: 3, v: 1, chirp: 0.4 }, kick: { at: 4, L: 4 }, lift: 6, riser: 3, blip: 0.25,
       hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false, tema: null, geri: false,
-      amen: clone(AMEN_DUZ), son: false, glitch: [],
+      amen: clone(AMEN_DUZ), son: false, glitch: [], tur: null, djN: 0, djEski: null,
     };
   }
 
@@ -232,9 +249,14 @@ export class Besteci {
     s.slide = this.rng.chance(0.8) ? this.slideStep(s) : null;
   }
 
+  // çalan tür: DJ setinde durumun (sayfa sayfa saklanır), yoksa kullanıcının seçtiği
+  tur(s = this.s) {
+    return this.settings.dj ? s.tur : this.settings.amen;
+  }
+
   // kalıbın doğraması: doğranan türde şimdikinden başka bir doğrama, ötekilerde düz
   useDograma(s) {
-    if (!TURLER[this.settings.amen]?.dogra) {
+    if (!TURLER[this.tur(s)]?.dogra) {
       s.amen = clone(AMEN_DUZ);
       return;
     }
@@ -284,7 +306,18 @@ export class Besteci {
     this.newWanted = false;
     this.at = 0;
     s.tema = null;
-    if (TURLER[settings.amen]?.dogra) this.useDograma(s);
+    // DJ seti: tür iki yolculukta bir komşusuna geçer (yeni yolculuk düşüşle başlar, geçiş orada)
+    if (settings.dj && this.journey > 1 && ++s.djN >= DJ_TUR_YOLCULUK) {
+      s.djN = 0;
+      // bir önceki türe dönmez (set ilerler)
+      const cur = s.tur ?? 'techno';
+      const yol = DJ_YOL[cur].filter((t) => t !== s.djEski);
+      const t = rng.pick(yol.length ? yol : DJ_YOL[cur]);
+      s.djEski = cur;
+      s.tur = t === 'techno' ? null : t;
+      changed.add('amen');
+    }
+    if (TURLER[this.tur(s)]?.dogra) this.useDograma(s);
     if (this.journey === 1) {
       this.plan = [0, 1, 2, 3, ...ENDING];
       // kalıp seçildiyse ilk yolculuk da onunla çalar
@@ -329,7 +362,7 @@ export class Besteci {
     if (f.hat && !settings.hat) keys.push('hat');
     if (f.clap && !settings.clap && s.clap !== 'dort') keys.push('clap');
     if (f.perk && !settings.perk) keys.push('perk');
-    if (TURLER[settings.amen]?.dogra) keys.push('amen', 'amen', 'amen');
+    if (TURLER[this.tur(s)]?.dogra) keys.push('amen', 'amen', 'amen');
     const k = rng.pick(keys);
     if (k === 'amen') this.useDograma(s);
     if (k === 'slide') s.slide = s.M && s.slide !== null && rng.chance(0.25) ? null : this.slideStep(s, s.slide) ?? s.slide;
@@ -403,9 +436,10 @@ export class Besteci {
     // Tür (Amen, gabber …): kick çalacak bölümlerde kick'in, clap'in, hat'in ve ek vurmalının yerine (elle seçilenler
     // kalır; rim ve tom Amen'in senkopunun üstüne binince karışıyordu). Doğranan türde drop'ta düz kalıp döner;
     // cümle sonunda son yarım ölçü dolgu (sert türlerde roll), yükselişin son ölçüsünde roll hızlanarak gelir
-    if (st.amen && kick) {
-      const T = TURLER[st.amen];
-      const a = { ...clone(T.dogra && s.drop ? AMEN_DUZ : s.amen), tur: st.amen };
+    const tur = this.tur(s);
+    if (tur && kick) {
+      const T = TURLER[tur];
+      const a = { ...clone(T.dogra && s.drop ? AMEN_DUZ : s.amen), tur };
       if (s.gap) a.rho = T.sert ? [16, 16, 16, 16, 8, 4, 2, 1] : [16, 16, 16, 16, 16, 16, 8, 4];
       else if (s.roll || s.son) {
         a.rho[7] = T.sert ? 1 : 8;
@@ -432,6 +466,7 @@ export class Besteci {
     page.drop = !!s.drop;
     page.key = noteName(52 + s.base);
     page.mode = MODE_NAMES[s.c];
+    page.tur = this.tur(s);
     // kalıbın adı; desenin sayıları elle değiştiyse yok
     const k = KALIPLAR[s.kalip];
     page.kalip = page.sp.tune ? SARKILAR[this.settings.sarki].ad : k && k.n === s.n && k.M === s.M && k.p === s.p ? k.ad : null;

@@ -160,6 +160,8 @@
       <button id="kirilmaBtn" class="hamle" title="Sonraki sayfa kırılma: kick susar; ardından yükseliş ve drop. Kısayol: K">Kırılma <kbd>K</kbd></button>
       <button id="dropBtn" class="hamle" title="Sonraki sayfa yükseliş, ardından drop: her şey birden geri gelir. Kısayol: D">Drop <kbd>D</kbd></button>
       <button id="kayitBtn" class="kayit" aria-pressed="false" title="Grafiği, formülü ve sesi dikey (TikTok boyu) bir videoya kaydeder; bitirince dosya iner.">● Video kaydet</button>
+      <button id="wavBtn" class="kayit" aria-pressed="false" title="Çalan sesi kaydeder; bitirince WAV dosyası iner (tek kanal, 16 bit)">● WAV kaydet</button>
+      <button id="paylas" class="yeni" title="Bu şarkının bağlantısını kopyalar: açan kişi aynı şarkıyı aynı ayarlarla baştan duyar">Paylaş</button>
       <select id="kayitDil" title="Videodaki yazıların ve formülün dili"><option value="tr" selected>Türkçe video</option><option value="en">English video</option></select>
       <button id="oto" class="oto" aria-pressed="true" title="Sarı yazılı ayarları müzik bölüme göre kendisi çevirir. Bir sürgüyü tutarsan bıraktıktan sonra da bir süre sende kalır; bıraktığın yer yeni merkezi olur.">Kendi çeviriyor</button>
       <label class="ayar"><span>Tempo</span><input id="tempo" type="range" min="120" max="220" value="139"><output></output></label>
@@ -213,7 +215,7 @@
           <option value="video">videodaki (kayan)</option>
         </select></label>
         <label class="ayar"><span>Kick</span><input id="kick" type="range" min="0" max="100" value="50"><output></output></label>
-        <label class="ayar" title="Tür: davul o türün kalıbıyla formülden çalar; kick, clap ve hat'in yerine geçer (elle seçtiğin hat ve clap kalır). Her türün kendi kick'i ve temposu var, seçince Tempo ona geçer. Amen: 1969'dan beri jungle ve breakcore'un davulu. Jungle, breakcore ve mathcore'da besteci kalıbı yarım ölçülük parçalara bölüp karıştırır, drop'ta düz kalıp döner. Gabber, frenchcore, terrorcore ve speedcore'da kick kırpılmış ve uzun; cümle sonlarında ve drop'a giderken kick roll yapar. Formüldeki σ (parçaların sırası) ve ρ (tekrarın boyu) sayılarını çevirip kendin de doğrayabilirsin"><span>Tür</span><select id="amen"><option value="" selected>yok</option><option value="amen">Amen</option><option value="jungle">jungle</option><option value="dnb">drum &amp; bass</option><option value="core">breakcore</option><option value="footwork">footwork</option><option value="happy">happy hardcore</option><option value="gabber">gabber</option><option value="french">frenchcore</option><option value="terror">terrorcore</option><option value="speed">speedcore</option><option value="math">mathcore</option></select></label>
+        <label class="ayar" title="Tür: davul o türün kalıbıyla formülden çalar; kick, clap ve hat'in yerine geçer (elle seçtiğin hat ve clap kalır). Her türün kendi kick'i ve temposu var, seçince Tempo ona geçer. Amen: 1969'dan beri jungle ve breakcore'un davulu. Jungle, breakcore ve mathcore'da besteci kalıbı yarım ölçülük parçalara bölüp karıştırır, drop'ta düz kalıp döner. Gabber, frenchcore, terrorcore ve speedcore'da kick kırpılmış ve uzun; cümle sonlarında ve drop'a giderken kick roll yapar. Formüldeki σ (parçaların sırası) ve ρ (tekrarın boyu) sayılarını çevirip kendin de doğrayabilirsin. DJ seti: tür iki yolculukta bir komşu türe geçer (jungle'dan drum &amp; bass'e, breakcore'dan speedcore'a…), tempo dört ölçüde yenisine kayar"><span>Tür</span><select id="amen"><option value="" selected>yok</option><option value="amen">Amen</option><option value="jungle">jungle</option><option value="dnb">drum &amp; bass</option><option value="core">breakcore</option><option value="footwork">footwork</option><option value="happy">happy hardcore</option><option value="gabber">gabber</option><option value="french">frenchcore</option><option value="terror">terrorcore</option><option value="speed">speedcore</option><option value="math">mathcore</option><option value="dj">DJ seti</option></select></label>
         <label class="ayar" title="Glitch: besteci cümle sonlarında sesi keser: tekrar (son ½, ¼ ya da ⅛ vuruş döner), ters (geçmiş tersine çalar), kırık (bitcrush) ve drop'tan önce bant durur. Sağa doğru daha sık; %40'ı geçince cümlenin ortasında da gelir. Formülde G satırında yazar. Eller çevirirken girişte az, yükselişte çok. Sıfırda yok"><span>Glitch</span><input id="glitch" type="range" min="0" max="100" value="40"><output></output></label>
         <label class="ayar"><span>Kick deseni</span><select id="desen">
           <option value="" selected>bölüme göre</option>
@@ -268,6 +270,6 @@
     </div>
   </footer>
 
-  <script type="module" src="js/main.js?v=3a76e025"></script>
+  <script type="module" src="js/main.js?v=8ffc2a74"></script>
 </body>
 </html>

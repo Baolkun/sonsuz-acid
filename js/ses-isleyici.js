@@ -279,7 +279,11 @@ class FormulSes extends AudioWorkletProcessor {
     this.eLp = 1 - Math.exp((-TAU * ECHO_LP) / sampleRate);
     this.eHp = 1 - Math.exp((-TAU * ECHO_HP) / sampleRate);
     this.port.onmessage = ({ data }) => {
-      if (data.type === 'clock') this.clocks.push(data);
+      if (data.type === 'clock') {
+        // ondan sonraya kurulmuş saatler (eski tempo geçişi) atılır
+        while (this.clocks.length > 1 && this.clocks[this.clocks.length - 1].time >= data.time) this.clocks.pop();
+        this.clocks.push(data);
+      }
       else if (data.type === 'sample') this.smp[data.name] = data.data;
       else if (data.type === 'params') Object.assign(this.prm, data.values);
       else {
@@ -888,3 +892,35 @@ class FormulSes extends AudioWorkletProcessor {
 }
 
 registerProcessor('formul-ses', FormulSes);
+
+// WAV kaydı: girişteki ses parça parça ana sayfaya gider; 'dur' gelince kalan da gider, ardından null
+class Kaydedici extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.buf = new Float32Array(16384);
+    this.n = 0;
+    this.on = true;
+    this.port.onmessage = () => {
+      this.flush();
+      this.on = false;
+      this.port.postMessage(null);
+    };
+  }
+
+  flush() {
+    if (this.n) this.port.postMessage(this.buf.slice(0, this.n));
+    this.n = 0;
+  }
+
+  process(inputs) {
+    const x = inputs[0][0];
+    if (x && this.on) {
+      for (let i = 0; i < x.length; i++) {
+        this.buf[this.n++] = x[i];
+        if (this.n === this.buf.length) this.flush();
+      }
+    }
+    return this.on;
+  }
+}
+registerProcessor('kaydedici', Kaydedici);
