@@ -124,6 +124,7 @@ export class Besteci {
     this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null };
     this.locked = false;
     this.newWanted = false;
+    this.wantRoll = false; // elle istenen dolgu: sonraki sayfada
     this.no = 0; // kaçıncı sayfa
     this.journey = 0;
     this.plan = [];
@@ -310,7 +311,8 @@ export class Besteci {
       kick, M: s.M, n: s.n, p: s.p, q: s.q, acc: s.acc, bend: s.bend, slide, base: s.base, c: s.c, F: st.F, prog: s.prog.slice(),
       chord: f.chord, fill: f.fill ? { ...s.fill } : null, hocket: f.hocket ? { ...s.hocket } : null,
       blip: f.blip ? s.blip : 0, oct, riser: f.riser ? { w: s.riser } : null, lift: f.lift ? s.lift : null,
-      hat: H ? { on: H.on.slice(), open: H.open.slice(), from: enter('hat'), roll: !!s.roll } : null,
+      // dolgu hat'siz bölümde de çalar (yalnızca son vuruş)
+      hat: H ? { on: H.on.slice(), open: H.open.slice(), from: enter('hat'), roll: !!s.roll } : s.roll && !st.hat ? { on: [], open: [], from: null, roll: true } : null,
       clap: C ? { beats: C.beats.slice(), son: C.son, from: enter('clap') } : null,
       perk: P ? { ses: P.ses, m: P.m, on: P.on.slice(), from: enter('perk') } : null,
       gap: !!s.gap,
@@ -348,7 +350,8 @@ export class Besteci {
     const run = !fresh && prev && prev.eff === eff ? prev.run + 1 : 1;
     // hat dolgusu cümle sonunda: bölüm değişmeden önceki çift sayfada (sekiz ölçü bitti) ya da yolculuğun son sayfasında
     const after = this.plan[this.at + 1];
-    s.roll = f.hat > 1 && (after === undefined || (run % 2 === 0 && (settings.stage ?? after) !== eff));
+    s.roll = this.wantRoll || (f.hat > 1 && (after === undefined || (run % 2 === 0 && (settings.stage ?? after) !== eff)));
+    this.wantRoll = false;
     // drop: yükselişten sonra beşinci bölüm; yükselişin son yarım vuruşu sessiz kalır (drop öncesi boşluk)
     s.drop = settings.stage === null && !fresh && prev?.eff === 5 && eff === 4;
     s.gap = settings.stage === null && eff === 5 && after === 4;
@@ -418,6 +421,16 @@ export class Besteci {
     this.prev = k.prev;
     this.no = page.no + 1;
     this.last = page;
+  }
+
+  // elle hamle: verilen sayfadan sonra yolculuğun sonu gelir. 'kirilma': kırılma → yükseliş → drop; 'drop': yükseliş →
+  // drop (çalan sayfa yükselişse doğrudan drop). Bölüm elle seçiliyken ya da kilitliyken olmaz
+  jump(page, kind) {
+    if (this.locked || this.settings.stage !== null) return false;
+    this.rewindTo(page);
+    const seq = kind === 'kirilma' ? ENDING : page.stage === 5 ? ENDING.slice(2) : ENDING.slice(1);
+    this.plan = [...this.plan.slice(0, this.at), ...seq];
+    return true;
   }
 
   // yeni yolculuk verilen sayfanın yerine hemen başlar

@@ -109,6 +109,8 @@
   .cal { min-width: 108px; font-weight: 600; font-size: 15px; background: var(--kagit); color: var(--murekkep); border-color: var(--kagit); }
   .cal:hover { background: #e2f466; color: var(--murekkep); }
   .kilit[aria-pressed="true"], .oto[aria-pressed="true"] { background: var(--kagit); color: var(--murekkep); border-color: var(--kagit); }
+  .hamle kbd { font: 11px ui-monospace, monospace; opacity: .6; margin-left: 4px; }
+  .hamle[aria-pressed="true"] { background: #e2332a; border-color: #e2332a; color: #fff; }
   .sifirla { margin-left: auto; font-size: 12px; padding: 6px 12px; border-color: rgba(231, 236, 208, .25); color: rgba(231, 236, 208, .7); }
   .ayar { display: flex; align-items: center; gap: 8px; }
   .ayar > span { font-weight: 600; }
@@ -152,6 +154,9 @@
       <button id="cal" class="cal">▶ Çal</button>
       <button id="kilit" class="kilit" aria-pressed="false" title="Çalan desen tekrar etsin; ayarlarla ve formüldeki sayılarla sen oynat">Kilitle</button>
       <button id="yeni" class="yeni" title="Hemen yeni bir melodi yolculuğu başlar">Yeni melodi</button>
+      <button id="dolguBtn" class="hamle" title="Bu sayfanın son vuruşunda hi-hat dolgusu (geç kaldıysan sonraki sayfada). Kısayol: F">Dolgu <kbd>F</kbd></button>
+      <button id="kirilmaBtn" class="hamle" title="Sonraki sayfa kırılma: kick susar; ardından yükseliş ve drop. Kısayol: K">Kırılma <kbd>K</kbd></button>
+      <button id="dropBtn" class="hamle" title="Sonraki sayfa yükseliş, ardından drop: her şey birden geri gelir. Kısayol: D">Drop <kbd>D</kbd></button>
       <button id="oto" class="oto" aria-pressed="true" title="Sarı yazılı ayarları müzik bölüme göre kendisi çevirir. Bir sürgüyü tutarsan bıraktıktan sonra da bir süre sende kalır; bıraktığın yer yeni merkezi olur.">Kendi çeviriyor</button>
       <label class="ayar"><span>Tempo</span><input id="tempo" type="range" min="120" max="150" value="139"><output></output></label>
       <label class="ayar"><span>Ses</span><input id="ses" type="range" min="0" max="100" value="75"></label>

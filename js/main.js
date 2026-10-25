@@ -153,6 +153,38 @@ function newJourney() {
   compose();
 }
 
+// elle hamleler: dolgu çalan sayfanın son vuruşunda (geç kalındıysa sonraki sayfada); kırılma ve drop sonraki sayfada
+// başlar. Düğme hamle gerçekleşene kadar kırmızı yanar
+function flash(id, beats) {
+  const el = $(id);
+  el.setAttribute('aria-pressed', 'true');
+  const until = beatNow() + beats;
+  const off = () => (beatNow() >= until || !playing ? el.setAttribute('aria-pressed', 'false') : setTimeout(off, 100));
+  off();
+}
+function dolgu() {
+  const cur = livePage();
+  if (!cur) return;
+  const x = beatNow() - cur.beat - 8;
+  if (x < 6.75) {
+    liveEdit((s) => { s.roll = true; }, ['hat']);
+    flash('dolguBtn', 8 - x);
+  } else {
+    while (pages.length && pages[pages.length - 1] !== cur) pages.pop();
+    besteci.rewindTo(cur);
+    besteci.wantRoll = true;
+    compose();
+    flash('dolguBtn', 8 - x + PAGE);
+  }
+}
+function hamle(kind) {
+  const cur = livePage();
+  if (!cur || !besteci.jump(cur, kind)) return;
+  while (pages.length && pages[pages.length - 1] !== cur) pages.pop();
+  compose();
+  flash(`${kind}Btn`, cur.beat + PAGE - beatNow());
+}
+
 let renk = null; // ellerin bu sayfaya verdiği renk
 function showInfo(page) {
   const r = oto && renk ? ` · renk: ${RENKLER[renk].ad}` : '';
@@ -282,7 +314,17 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     toggle();
   }
+  // kısayollar: F dolgu, K kırılma, D drop (Cmd/Ctrl'lü olanlar tarayıcının)
+  if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || !playing) return;
+  const act = { KeyF: dolgu, KeyK: () => hamle('kirilma'), KeyD: () => hamle('drop') }[e.code];
+  if (act) {
+    e.preventDefault();
+    act();
+  }
 });
+$('dolguBtn').addEventListener('click', () => playing && dolgu());
+$('kirilmaBtn').addEventListener('click', () => playing && hamle('kirilma'));
+$('dropBtn').addEventListener('click', () => playing && hamle('drop'));
 $('tempo').addEventListener('input', () => {
   bpm = num('tempo');
   if (shown) showInfo(shown);
