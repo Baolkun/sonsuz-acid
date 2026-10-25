@@ -146,6 +146,37 @@ export function perkAt(sp, x) {
   return { ses: p.ses, vel: p.ses === 'shaker' ? SHAKER_V[mod(s, 4)] : 1, k };
 }
 
+// Amen break: The Winstons'ın "Amen, Brother"ındaki dört ölçülük davul, on altılık on altılık (K kick, S snare,
+// s hayalet snare, X kick ve crash, . boş); çift adımlarda ride. Sayfa dört ölçü: Amen sayfaya tam oturur
+export const AMEN = 'K.K.S..s.sKKS..s' + 'K.K.S..s.sKKS..s' + 'K.K.S..s.sK...S.' + '.sKKS..s.sX...S.';
+export const AMEN_H = { K: 0.5, X: 0.5, S: 0.35, s: 0.15, r: 0.08 }; // grafikte vuruşun boyu (r: yalnız ride)
+// Breakcore doğraması: sayfa sekiz yarım ölçü (c); her biri Amen'in σ[c]'inci yarım ölçüsünü çalar. ρ[c] tekrarın boyu
+// (otuz ikilik): 16 düz, 8 yarım ölçünün son yarısı iki kez, 1 son adımı her otuz ikilikte (snare roll).
+// { ch, vel, ride, i } ya da null; otuz ikiliğin başında, kaynakta yeni bir on altılık başlıyorsa
+export function breakAt(sp, x) {
+  const a = sp.amen;
+  if (!a) return null;
+  const t = mod(Math.floor(8 * (x + 8)), 128);
+  const c = t >> 4;
+  const r = a.rho[c];
+  const k = (t & 15) % r;
+  if (k % 2 && r > 1) return null;
+  const i = mod(8 * a.sig[c] + 8 - Math.ceil(r / 2) + Math.floor(k / 2), 64);
+  // roll: hep snare, yarım ölçü boyunca yükselerek
+  if (r <= 2) return { ch: 'S', vel: 0.35 + 0.65 * ((t & 15) / 15), ride: false, i };
+  const ch = AMEN[i];
+  const ride = i % 2 === 0;
+  if (ch === '.' && !ride) return null;
+  return { ch, vel: ch === 's' ? 0.35 : 1, ride, i };
+}
+export const BREAK_Y = -2;
+export function breakY(sp, x) {
+  const u = frac(8 * x);
+  if (u >= GATE) return null;
+  const b = breakAt(sp, x);
+  return b ? BREAK_Y + (AMEN_H[b.ch] ?? AMEN_H.r) * Math.exp(-30 * u) : null;
+}
+
 // pad: akorun üç notası (dizide kök, üçlü, beşli; i = 0, 1, 2), basın iki oktav üstünde, ölçü boyunca tutulur
 export function padY(sp, x, i) {
   return sp.pad ? (scaleSemi(sp.c, rootAt(sp, x) + 2 * i) + 24 + sp.base) / 12 : null;
@@ -225,6 +256,11 @@ function clapRow(sp) {
   return [`−${-CLAP_Y} + 0.3${ex(`−12${FRAC}(4${X})`)}`, `${IF} ${from(c)}${on}, ${FRAC}(4${X}) &lt; ${HALF}`];
 }
 
+function breakRow(sp) {
+  const k = `(⌊8${X}⌋ ${MOD} 16 ${MOD} ${V('ρ')})`;
+  return [`−${-BREAK_Y} + ${V('h')}(${V('A')}<sub>${V('a')}</sub>)${ex(`−30${FRAC}(8${X})`)}`, `${IF} ${k} ${MOD} 2 = 0, ${FRAC}(8${X}) &lt; ${HALF} <span class="op">(amen)</span>`];
+}
+
 function perkRow(sp) {
   const p = sp.perk;
   const sh = p.ses === 'shaker';
@@ -279,7 +315,7 @@ export function renderFormula(sp, en = false) {
   if (sp.hocket) mel = brace([[hocketPart(sp), `${IF} ${V('j')} ${MOD} 3 &gt; 0`], [mel]]);
   mel += extras(sp);
   const pad = sp.pad && [fr(`${V('S')}(${V('r')} + 2${V('i')}) + ${N('pad', 24)} − ${N('base', -sp.base, 'base')}`, 12), `${V('i')} ${IN} {0, 1, 2}`];
-  const rows = [sp.kick && kickRow(sp), sp.hat && hatRow(sp), sp.perk && perkRow(sp), sp.clap && clapRow(sp), pad].filter(Boolean);
+  const rows = [sp.kick && kickRow(sp), sp.amen && breakRow(sp), sp.hat && hatRow(sp), sp.perk && perkRow(sp), sp.clap && clapRow(sp), pad].filter(Boolean);
   const main = rows.length ? brace([...rows, [mel]]) : mel;
   const defs = sp.tune
     ? [`${V('T')} = (${sp.tune.T.join(', ')})[⌊2(${X} + 8)⌋]`]
@@ -292,6 +328,16 @@ export function renderFormula(sp, en = false) {
   if (sp.hat || sp.perk?.ses === 'shaker') defs.push(`${V('u')} = ${FRAC}(4${X}) − ${SWING}(⌊4${X}⌋ ${MOD} 2)`);
   if (sp.hat) {
     defs.push(`${V('v')} = (${HAT_V.join(', ')})[⌊4${X}⌋ ${MOD} 4]${sp.hat.roll ? ` (${X} ≥ 7: ${V('v')} = 0.4 + 0.15(⌊4${X}⌋ ${MOD} 4))` : ''}`);
+  }
+  if (sp.amen) {
+    const a = sp.amen;
+    defs.push(
+      `${V('a')} = 8${V('σ')} + 8 − ⌈${fr(V('ρ'), 2)}⌉ + ⌊${fr(`⌊8${X}⌋ ${MOD} 16 ${MOD} ${V('ρ')}`, 2)}⌋`,
+      `${V('σ')} = (${a.sig.map((d, i) => N('amen', d, `amen.s.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 2)}⌋]`,
+      `${V('ρ')} = (${a.rho.map((d, i) => N('amen', d, `amen.r.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 2)}⌋]`,
+      `${V('A')} = ${AMEN.match(/.{16}/g).join(' ')}`,
+      `${V('h')}: K ${AMEN_H.K}, S ${AMEN_H.S}, s ${AMEN_H.s}, ride (${V('a')} ${MOD} 2 = 0) ${AMEN_H.r}`,
+    );
   }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);
   defs.push(`${V('r')} = (${sp.prog.map((d, i) => N('prog', d, `prog.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 4)}⌋]`);

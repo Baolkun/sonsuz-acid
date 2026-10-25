@@ -21,8 +21,11 @@
 
 // Ek vurmalı satırı: shaker (gürültü, tizde bir bantta, kısa), rim (808'deki gibi iki kısa çınlayan sinüs, biraz
 // kırpılmış: tahta "tok"), tom (perdesi hızla inen sinüs; iki ölçünün sonunda her vuruşta biraz daha pes).
+// Amen satırı (break): kendi davul takımı, otuz ikiliğe girerken satır tanımlıysa vurulur. Kick perdesi hızla inen
+// sinüs (pompayı o da tetikler), snare iki kısa sinüs ve süzülmüş gürültü (hayalet snare kısık ve kısa), ride hat'in
+// metali alçak bir bantta uzun söner, crash tizde uzun gürültü. Düzeyleri Kick, Clap ve Hat ayarlarından gelir.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -60,7 +63,14 @@ const RIM_HZ = [455, 1667]; // 808'in rim'i
 const RIM_DECAY = [0.012, 0.007]; // s
 const TOM_HZ = 190; // ilk vuruşun perdesi; sonrakiler çeyrek oktav iner
 const TOM_DECAY = 0.22; // s
-const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6, perk: 0.4 };
+const BK_DECAY = 0.16; // s: Amen'in kick'i
+const SN_HZ = [185, 330]; // snare'in gövdesi
+const SN_DECAY = [0.05, 0.13]; // s: gövde, gürültü (hayalet snare'de yarısı)
+const SN_HP = 900; // Hz: snare gürültüsünün altı
+const RIDE_DECAY = 0.45; // s
+const RIDE_HP = 4500; // Hz
+const CRASH_DECAY = 1.1; // s
+const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6, perk: 0.4, brk: 0.35 };
 const ROOM_HP = 250; // Hz: yankıya giden sesin altı kesilir
 const ROOM_DAMP = 5000; // Hz: hatların içinde tizi koyulaştırır
 const ROOM_OUT = 0.6;
@@ -164,6 +174,25 @@ class FormulSes extends AudioWorkletProcessor {
     this.qPh = new Float64Array(2);
     this.qs1 = 0;
     this.qs2 = 0;
+    // Amen
+    this.bt = null; // çalan otuz ikilik
+    this.bkAge = 1;
+    this.bkPh = 0;
+    this.bkHz = KICK_HZ;
+    this.snAge = 1;
+    this.snVel = 1;
+    this.snPh = new Float64Array(2);
+    this.snHp = 0;
+    this.snLp = 0;
+    this.rdAge = 1;
+    this.rdVel = 0;
+    this.rd1 = 0;
+    this.rd2 = 0;
+    this.crAge = 9;
+    this.crHp = 0;
+    this.snHpA = 1 - Math.exp((-TAU * SN_HP) / sampleRate);
+    this.snLpA = 1 - Math.exp((-TAU * 7000) / sampleRate);
+    this.rdHpA = 1 - Math.exp((-TAU * RIDE_HP) / sampleRate);
     // pad
     this.pPh = new Float64Array(6);
     this.pHz = new Float64Array(3);
@@ -360,6 +389,30 @@ class FormulSes extends AudioWorkletProcessor {
           }
         }
 
+        // Amen: otuz ikiliğe girerken
+        const bt = Math.floor(8 * beat);
+        if (bt !== this.bt) {
+          this.bt = bt;
+          const h = breakAt(sp, x);
+          if (h) {
+            if (h.ch === 'K' || h.ch === 'X') {
+              this.bkAge = 0;
+              this.bkPh = 0;
+              this.bkHz = KICK_HZ * 2 ** ((sp.base + 12) / 12);
+            }
+            if (h.ch === 'S' || h.ch === 's') {
+              this.snAge = 0;
+              this.snVel = h.vel;
+              this.snPh.fill(0);
+            }
+            if (h.ch === 'X') this.crAge = 0;
+            else if (h.ride) {
+              this.rdAge = 0;
+              this.rdVel = h.i % 4 === 0 ? 1 : 0.6;
+            }
+          }
+        }
+
         // kick: sinüs sıfırdan başlar, böylece vuruş tık değil tok bir "bum" olur
         const yk = kickY(sp, x);
         if (yk !== null) {
@@ -496,8 +549,57 @@ class FormulSes extends AudioWorkletProcessor {
         perk *= this.qVel;
       }
       this.qAge += 1 / sr;
+      // Amen
+      let bk = 0;
+      if (this.bkAge < 1) {
+        const a = this.bkAge;
+        this.bkPh += (this.bkHz * (1 + 3 * Math.exp(-a / 0.012))) / sr;
+        if (this.bkPh >= 1) this.bkPh -= 1;
+        bk = (Math.tanh(KICK_DRIVE * Math.sin(TAU * this.bkPh)) / Math.tanh(KICK_DRIVE)) * 1.2 * Math.exp(-a / BK_DECAY) * (1 - Math.exp(-a / 0.0005));
+      }
+      this.bkAge += 1 / sr;
+      let brk = 0;
+      if (this.snAge < 1) {
+        const a = this.snAge;
+        const ghost = this.snVel < 0.5 ? 0.5 : 1;
+        let body = 0;
+        for (let k = 0; k < 2; k++) {
+          this.snPh[k] += SN_HZ[k] / sr;
+          body += Math.sin(TAU * this.snPh[k]);
+        }
+        this.snHp += (noise - this.snHp) * this.snHpA;
+        this.snLp += (noise - this.snHp - this.snLp) * this.snLpA;
+        const att = 1 - Math.exp(-a / 0.0007);
+        brk += this.snVel * att * (0.5 * body * Math.exp(-a / (SN_DECAY[0] * ghost)) + 1.4 * this.snLp * Math.exp(-a / (SN_DECAY[1] * ghost)));
+      }
+      this.snAge += 1 / sr;
+      let ride = 0;
+      if (this.rdAge < 3 * RIDE_DECAY || this.crAge < 3 * CRASH_DECAY) {
+        if (this.rdAge < 3 * RIDE_DECAY) {
+          let metal = 0;
+          for (let k = 0; k < METAL.length; k++) metal += this.mPh[k] < 0.5 ? 1 : -1;
+          // hat çalmıyorsa metalin evresi burada ilerler
+          if (this.hAge >= 8 * this.hDecay) {
+            for (let k = 0; k < METAL.length; k++) {
+              this.mPh[k] += (1.7 * METAL[k]) / sr;
+              if (this.mPh[k] >= 1) this.mPh[k] -= 1;
+            }
+          }
+          const m = metal / 6 + 0.3 * noise;
+          this.rd1 += (m - this.rd1) * this.rdHpA;
+          this.rd2 += (m - this.rd1 - this.rd2) * this.rdHpA;
+          ride = 0.5 * this.rdVel * (m - this.rd1 - this.rd2) * Math.exp(-this.rdAge / RIDE_DECAY);
+        }
+        if (this.crAge < 3 * CRASH_DECAY) {
+          this.crHp += (noise - this.crHp) * this.rdHpA;
+          ride += 0.6 * (noise - this.crHp) * Math.exp(-this.crAge / CRASH_DECAY);
+        }
+      }
+      this.rdAge += 1 / sr;
+      this.crAge += 1 / sr;
       // pompa: kick'in vurduğu an kısılır (başı 4 ms'de iner, tık olmasın), sonra geri gelir; kick yoksa düz
-      const duck = 1 - now.pump * PUMP_DEPTH * Math.exp(-this.kAge / PUMP_TIME) * (1 - Math.exp(-this.kAge / 0.004));
+      const kA = Math.min(this.kAge, this.bkAge);
+      const duck = 1 - now.pump * PUMP_DEPTH * Math.exp(-kA / PUMP_TIME) * (1 - Math.exp(-kA / 0.004));
       this.gapG += (gapT - this.gapG) * this.fade;
       // pad: altı testere, yumuşak filtre; pompa ona daha derin
       this.pAmp += (padT - this.pAmp) * (padT > this.pAmp ? this.pIn : this.pOut);
@@ -521,17 +623,18 @@ class FormulSes extends AudioWorkletProcessor {
         const v2 = this.p2 + a2 * this.p1 + g * a2 * v3;
         this.p1 = 2 * v1 - this.p1;
         this.p2 = 2 * v2 - this.p2;
-        const padDuck = 1 - Math.min(1, 1.25 * now.pump) * PUMP_DEPTH * Math.exp(-this.kAge / (1.6 * PUMP_TIME)) * (1 - Math.exp(-this.kAge / 0.004));
+        const padDuck = 1 - Math.min(1, 1.25 * now.pump) * PUMP_DEPTH * Math.exp(-kA / (1.6 * PUMP_TIME)) * (1 - Math.exp(-kA / 0.004));
         padOut = (v2 / 6) * this.pAmp * now.pad * padDuck * this.gapG;
       }
       const melOut = mel * MEL * comp * duck * this.gapG;
       const hatOut = hat * now.hat * this.gapG;
       const clapOut = clap * now.clap * this.gapG;
       const perkOut = perk * now.perk * this.gapG;
+      const brkOut = (brk * now.clap + ride * now.hat) * this.gapG;
       // oda: sönme süresi (RT60) 0,8 … 2,2 s, Oda ayarıyla uzar
       let wet = 0;
       if (now.room > 0.001) {
-        let send = ROOM_SEND.mel * melOut + ROOM_SEND.hat * hatOut + ROOM_SEND.clap * clapOut + ROOM_SEND.pad * padOut + ROOM_SEND.perk * perkOut;
+        let send = ROOM_SEND.mel * melOut + ROOM_SEND.hat * hatOut + ROOM_SEND.clap * clapOut + ROOM_SEND.pad * padOut + ROOM_SEND.perk * perkOut + ROOM_SEND.brk * brkOut;
         this.rHp += (send - this.rHp) * this.rHpA;
         send -= this.rHp;
         const rt = 0.8 + 1.4 * now.room;
@@ -553,7 +656,7 @@ class FormulSes extends AudioWorkletProcessor {
         }
         wet *= (ROOM_OUT / 8) * now.room * (0.6 + 0.4 * duck);
       }
-      const v = (melOut + padOut + kick * now.kick * this.gapG + hatOut + clapOut + perkOut + wet) * this.level;
+      const v = (melOut + padOut + (kick + bk) * now.kick * this.gapG + hatOut + clapOut + perkOut + brkOut + wet) * this.level;
       // tavan: 0,8'e kadar dokunmaz, üstünü yumuşakça 1'in altında tutar; uç ayarlarda bile ses patlamaz
       const a = Math.abs(v);
       out[i] = a <= 0.8 ? v : Math.sign(v) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2));

@@ -80,6 +80,18 @@ export const SARKILAR = {
     prog: [[4, 0, 4, 0], [3, 2, 4, 0]],
   },
 };
+// Breakcore doğramaları: σ sayfanın sekiz yarım ölçüsünde Amen'in hangi yarım ölçüsü çalar, ρ tekrarın boyu (otuz ikilik;
+// 16 düz). Hepsi ölçü başını kick'le açar, ikinci ve dördüncü vuruşta snare kalır: doğrama oynar ama ritim dağılmaz
+export const DOGRAMALAR = [
+  { sig: [0, 1, 0, 1, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
+  { sig: [0, 1, 2, 3, 0, 1, 6, 7], rho: [16, 16, 16, 8, 16, 16, 16, 16] },
+  { sig: [0, 3, 2, 1, 4, 7, 6, 5], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
+  { sig: [0, 1, 6, 7, 0, 1, 6, 7], rho: [16, 16, 16, 16, 16, 8, 16, 16] },
+  { sig: [0, 0, 2, 2, 4, 5, 6, 6], rho: [16, 8, 16, 8, 16, 16, 16, 8] },
+  { sig: [4, 5, 0, 1, 6, 1, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
+];
+export const AMEN_DUZ = { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] };
+export const RHO = [16, 8, 4, 2, 1];
 // şarkının bir sayfası: T her sekizliğin basamağı (32), A notanın başladığı sekizliklerden yeniden vurulanlar (ölçü başı ya
 // da bir öncekiyle aynı perde: 303'te perde değişmeden nota ancak vurguyla yeniden vurulur)
 function tunePage(song, half) {
@@ -147,7 +159,7 @@ export class Besteci {
   constructor(seed) {
     this.rng = createRng(seed);
     // kullanıcının ayarları; stage, kick ve key null ise besteci kendisi seçer
-    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null };
+    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null, amen: null };
     this.locked = false;
     this.newWanted = false;
     this.wantRoll = false; // elle istenen dolgu: sonraki sayfada
@@ -162,6 +174,7 @@ export class Besteci {
       kalip: 'video', M: null, n: 5, p: 2, q: 32, acc: 2, bend: 4, slide: null, base: -18, c: 2, prog: [0, 0, 0, 0],
       fill: { u: 3, v: 6 }, hocket: { u: 3, v: 1, chirp: 0.4 }, kick: { at: 4, L: 4 }, lift: 6, riser: 3, blip: 0.25,
       hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false, tema: null, geri: false,
+      amen: clone(AMEN_DUZ), son: false,
     };
   }
 
@@ -215,6 +228,16 @@ export class Besteci {
     s.slide = this.rng.chance(0.8) ? this.slideStep(s) : null;
   }
 
+  // Amen'in doğraması: breakcore'da şimdikinden başka bir doğrama, düz Amen'de düz
+  useDograma(s) {
+    if (this.settings.amen !== 'core') {
+      s.amen = clone(AMEN_DUZ);
+      return;
+    }
+    const now = JSON.stringify(s.amen.sig);
+    s.amen = clone(this.rng.pick(DOGRAMALAR.filter((d) => JSON.stringify(d.sig) !== now)));
+  }
+
   // yeni yolculuğun kalıbı: ağırlığına göre; bir öncekinden ve onun kardeşlerinden başka
   pickKalip(prev) {
     const old = KALIPLAR[prev];
@@ -236,6 +259,7 @@ export class Besteci {
     this.newWanted = false;
     this.at = 0;
     s.tema = null;
+    if (settings.amen === 'core') this.useDograma(s);
     if (this.journey === 1) {
       this.plan = [0, 1, 2, 3, ...ENDING];
       // kalıp seçildiyse ilk yolculuk da onunla çalar
@@ -280,7 +304,9 @@ export class Besteci {
     if (f.hat && !settings.hat) keys.push('hat');
     if (f.clap && !settings.clap && s.clap !== 'dort') keys.push('clap');
     if (f.perk && !settings.perk) keys.push('perk');
+    if (settings.amen === 'core') keys.push('amen', 'amen', 'amen');
     const k = rng.pick(keys);
+    if (k === 'amen') this.useDograma(s);
     if (k === 'slide') s.slide = s.M && s.slide !== null && rng.chance(0.25) ? null : this.slideStep(s, s.slide) ?? s.slide;
     if (k === 'bend') s.bend = s.bend !== null && rng.chance(0.3) ? null : this.bendStep(s, s.bend) ?? s.bend;
     if (k === 'prog') this.moveChord(s);
@@ -346,6 +372,18 @@ export class Besteci {
       gap: !!s.gap,
       pad: f.pad ? { lvl: f.pad } : null,
     };
+    // Amen: kick çalacak bölümlerde kick'in, clap'in ve hat'in yerine (elle seçilenler kalır). Drop'ta düz Amen döner;
+    // cümle sonunda son yarım ölçü dolgu (breakcore'da snare roll), yükselişin son ölçüsünde roll hızlanarak gelir
+    if (st.amen && kick) {
+      const core = st.amen === 'core';
+      const a = core && s.drop ? clone(AMEN_DUZ) : clone(s.amen);
+      if (s.gap) a.rho = [16, 16, 16, 16, 16, 16, 8, 4].map((r, i) => (core ? [16, 16, 16, 16, 8, 4, 2, 1][i] : r));
+      else if (s.roll || s.son) {
+        a.rho[7] = core ? 1 : 8;
+        if (core) a.rho[6] = 8;
+      }
+      Object.assign(sp, { amen: a, kick: null, clap: st.clap ? sp.clap : null, hat: st.hat ? sp.hat : null });
+    }
     // şarkı: melodi notaları listeden okur; bas satırının kalıbı, dolgusu, hoketi, kayması susar, akorlar şarkınınki
     const song = SARKILAR[st.sarki];
     if (song) {
@@ -389,6 +427,8 @@ export class Besteci {
     const after = this.plan[this.at + 1];
     const kirilmaOncesi = settings.stage === null && after === 6 && eff !== 6;
     s.roll = this.wantRoll || (f.hat > 1 && (after === undefined || kirilmaOncesi || (run % 2 === 0 && (settings.stage ?? after) !== eff)));
+    // Amen'in dolgusu her sekiz ölçünün sonunda (bölüm sürerken de)
+    s.son = this.wantRoll || after === undefined || kirilmaOncesi || run % 2 === 0;
     this.wantRoll = false;
     // drop: yükselişten sonra beşinci bölüm; yükselişin son yarım vuruşu sessiz kalır (drop öncesi boşluk)
     s.drop = settings.stage === null && !fresh && prev?.eff === 5 && eff === 4;
@@ -519,6 +559,13 @@ export class Besteci {
       case 'blip': s.blip = step(s.blip, 0.05, 1, 0.05); break;
       case 'lift': s.lift = step(s.lift, 4, 8, 0.5); break;
       case 'riser': s.riser = step(s.riser, 2, 8); break;
+      case 'amen': {
+        // σ yarım ölçü 0 … 7 döner; ρ 16 → 8 → 4 → 2 → 1 → 16 döner (tık kısaltır)
+        const [, w, i] = path.split('.');
+        if (w === 's') s.amen.sig[i] = wrap(s.amen.sig[i], 8);
+        else s.amen.rho[i] = RHO[mod(RHO.indexOf(s.amen.rho[i]) + dir, RHO.length)];
+        break;
+      }
       case 'kick': s.kick[b] = b === 'at' ? step(s.kick.at, -8, 8) : step(s.kick.L, 2, 8); break;
     }
   }

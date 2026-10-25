@@ -174,7 +174,7 @@ function dolgu() {
   if (!cur) return;
   const x = beatNow() - cur.beat - 8;
   if (x < 6.75) {
-    liveEdit((s) => { s.roll = true; }, ['hat']);
+    liveEdit((s) => { s.roll = true; s.son = true; }, ['hat', 'amen']);
     flash('dolguBtn', 8 - x);
   } else {
     while (pages.length && pages[pages.length - 1] !== cur) pages.pop();
@@ -463,6 +463,17 @@ $('kalip').addEventListener('change', () => {
   besteci.settings.kalip = id;
   if (id) liveEdit((s) => besteci.useKalip(s, id), ['M', 'n', 'p', 'acc', 'bend', 'slide']);
 });
+// Amen seçilince çalan sayfa hemen breakbeat'le yeniden yazılır; breakcore'da besteci doğramayı kendi seçer
+$('amen').addEventListener('change', () => {
+  besteci.settings.amen = $('amen').value || null;
+  liveEdit((s) => besteci.useDograma(s), ['amen']);
+  // breakcore hızlı çalar: tempo yavaşsa 172'ye çıkar (sonra elle değiştirilebilir)
+  if (besteci.settings.amen === 'core' && num('tempo') < 160) {
+    $('tempo').value = 172;
+    $('tempo').dispatchEvent(new Event('input'));
+    showValue($('tempo'));
+  }
+});
 // şarkı seçilince çalan sayfa hemen o melodiyle yeniden yazılır
 $('sarki').addEventListener('change', () => {
   besteci.settings.sarki = $('sarki').value || null;
@@ -601,6 +612,15 @@ st.kalip = $('kalip').value || null;
 const sarkiQ = new URLSearchParams(location.search).get('sarki');
 if (sarkiQ && [...$('sarki').options].some((o) => o.value === sarkiQ)) $('sarki').value = sarkiQ;
 st.sarki = $('sarki').value || null;
+// ?break=amen ya da ?break=core adresi breakbeat'le açar
+const breakQ = new URLSearchParams(location.search).get('break');
+if (breakQ && [...$('amen').options].some((o) => o.value === breakQ)) $('amen').value = breakQ;
+st.amen = $('amen').value || null;
+if (breakQ === 'core' && num('tempo') < 160) {
+  $('tempo').value = 172;
+  showValue($('tempo'));
+}
+if (st.amen === 'core') besteci.useDograma(besteci.s);
 besteci.s.c = besteci.moodC();
 if (st.key !== null) besteci.s.base = besteci.keyBase(st.key);
 bpm = num('tempo');

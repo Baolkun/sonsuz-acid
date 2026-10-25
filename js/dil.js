@@ -89,6 +89,9 @@ export const EN = {
   "Basın 16 adımlık ritim kalıbı: vurgulu notalar ölçüde hep aynı yere düşer, desen dört ölçü boyunca tekrar eder. Kendiliğinden: her yolculukta başka bir kalıp. Videodaki: 5'li desen ölçünün üstünde kayar (ilk yolculuk böyle)":
     'The 16-step rhythm pattern of the bass: accented notes always fall on the same place in the bar, and the pattern repeats over four bars. Automatic: a different pattern every journey. Original: a 5-step pattern that shifts over the bar (the first journey is like this)',
   'Kalıp': 'Pattern',
+  "Amen break: 1969'dan beri jungle ve breakcore'un davulu, burada formülden çalar; kick, clap ve hat'in yerine geçer (elle seçtiğin hat ve clap kalır). Breakcore: besteci Amen'i yarım ölçülük parçalara bölüp karıştırır, cümle sonlarında snare roll yapar, drop'ta düz Amen döner. Formüldeki σ (parçaların sırası) ve ρ (tekrarın boyu) sayılarını çevirip kendin de doğrayabilirsin. Breakcore hızlı sever: seçince Tempo 172'ye çıkar":
+    'The Amen break: the drums of jungle and breakcore since 1969, played here from the formula; it replaces the kick, clap and hat (a hat or clap you picked stays). Breakcore: the composer chops the Amen into half-bar pieces and shuffles them, rolls the snare at the end of phrases, and brings the straight Amen back at the drop. Turn the σ (order of the pieces) and ρ (repeat length) numbers in the formula to chop it yourself. Breakcore likes speed: picking it sets Tempo to 172',
+  'Break': 'Break',
   'ara vuruş': 'offbeat',
   'vuruş öncesi': 'before the beat',
   'vuruş sonrası': 'after the beat',
