@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonsuz Acid</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --masa: #10110c;
+    --kagit: #d6ec4f;
+    --murekkep: #13140f;
+    --soluk: rgba(19, 20, 15, .6);
+    --kirmizi: #e2332a;
+    --acik: #e7ecd0;
+    --math: "STIX Two Math", "STIX Two Text", "Latin Modern Math", "Cambria Math", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--masa);
+    color: var(--acik);
+    font-family: var(--sans);
+  }
+
+  /* buruşuk limon yeşili kâğıt: kırışıklar ışıklandırılmış gürültüden, ortadaki kat izi bir geçişten */
+  .kagit {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    margin: 16px 16px 0;
+    display: flex;
+    flex-direction: column;
+    color: var(--murekkep);
+    border-radius: 2px;
+    background-color: var(--kagit);
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 225, .18), rgba(255, 255, 225, 0) 45%, rgba(60, 80, 0, .12) 45.6%, rgba(60, 80, 0, 0) 64%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='640'><filter id='k' x='0' y='0' width='100%' height='100%'><feTurbulence type='turbulence' baseFrequency='.0032 .0042' numOctaves='4' seed='23' stitchTiles='stitch'/><feDiffuseLighting lighting-color='white' surfaceScale='5' diffuseConstant='1.2'><feDistantLight azimuth='225' elevation='55'/></feDiffuseLighting></filter><rect width='900' height='640' filter='url(%23k)'/></svg>");
+    background-size: 100% 100%, 900px 640px;
+    background-blend-mode: normal, multiply;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+    overflow: hidden;
+  }
+  .ust {
+    position: absolute;
+    inset: 0 0 auto 0;
+    padding: 12px 18px;
+    pointer-events: none;
+    font-family: var(--math);
+  }
+  .bolum { font-size: 19px; }
+  .bilgi { font-size: 12.5px; color: var(--soluk); margin-top: 2px; }
+  /* tuval bir kutunun içinde: kendi piksel boyutu yerleşimi büyütmesin */
+  .cizim { position: relative; flex: 1; min-height: 240px; }
+  canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+  /* formül */
+  .alt { position: relative; padding: 0 22px 34px; min-height: 150px; }
+  .formul { font-family: var(--math); font-size: 17px; line-height: 1.3; overflow-x: auto; padding-bottom: 4px; }
+  .formul i { font-style: italic; }
+  .formul .op { font-style: normal; margin: 0 .08em; }
+  .formul sup { font-size: .66em; line-height: 0; }
+  .denklem { display: flex; flex-wrap: wrap; align-items: center; column-gap: .35em; row-gap: .4em; }
+  .kesir { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 .12em; }
+  .kesir > span:first-child { border-bottom: 1px solid currentColor; padding: 0 .18em .06em; }
+  .kesir > span:last-child { padding: .06em .18em 0; }
+  .parca { display: inline-flex; align-items: stretch; vertical-align: middle; }
+  .kume { width: .55em; height: auto; flex: none; margin-right: .3em; }
+  .satirlar { display: grid; grid-template-columns: auto auto; column-gap: 1.8em; row-gap: .45em; align-items: center; }
+  .kosul { font-size: .92em; white-space: nowrap; }
+  .tanimlar { display: flex; flex-wrap: wrap; gap: .25em 2.2em; margin-top: .7em; font-size: .86em; color: var(--soluk); }
+  .p { border-radius: 2px; }
+  .p.degisti { animation: degisti 3.4s ease-out; }
+  @keyframes degisti {
+    0%, 45% { color: var(--kirmizi); background: rgba(255, 255, 255, .4); }
+    100% { color: inherit; background: transparent; }
+  }
+  .ipucu { margin: 6px 0; color: var(--soluk); font-style: italic; }
+  .sayac { position: absolute; right: 18px; bottom: 10px; font-family: var(--math); font-size: 13px; }
+
+  /* formüldeki oynatılabilir sayılar */
+  .p.e { cursor: ns-resize; border-bottom: 1px dotted rgba(19, 20, 15, .55); }
+  .p.e:hover, .p.e:focus { background: rgba(255, 255, 255, .5); outline: none; }
+  .oyna { margin: 8px 0 0; font-size: 12px; font-style: italic; color: var(--soluk); }
+
+  /* ayarlar */
+  .kontroller { padding: 14px 16px 18px; font-size: 13px; }
+  .ana { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; }
+  .gruplar { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px 28px; margin-top: 16px; }
+  .grup { margin: 0; padding: 10px 0 0; border: 0; border-top: 1px solid rgba(231, 236, 208, .16); display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .grup legend { padding: 0 10px 0 0; font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: rgba(231, 236, 208, .55); }
+  button {
+    font: inherit;
+    color: var(--acik);
+    background: transparent;
+    border: 1.5px solid rgba(231, 236, 208, .45);
+    border-radius: 999px;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--kagit); color: var(--kagit); }
+  .cal { min-width: 108px; font-weight: 600; font-size: 15px; background: var(--kagit); color: var(--murekkep); border-color: var(--kagit); }
+  .cal:hover { background: #e2f466; color: var(--murekkep); }
+  .kilit[aria-pressed="true"], .oto[aria-pressed="true"] { background: var(--kagit); color: var(--murekkep); border-color: var(--kagit); }
+  .sifirla { margin-left: auto; font-size: 12px; padding: 6px 12px; border-color: rgba(231, 236, 208, .25); color: rgba(231, 236, 208, .7); }
+  .ayar { display: flex; align-items: center; gap: 8px; }
+  .ayar > span { font-weight: 600; }
+  .grup .ayar { display: grid; grid-template-columns: 84px minmax(0, 1fr) 78px; gap: 10px; }
+  .grup .ayar > span { font-weight: 500; color: rgba(231, 236, 208, .88); transition: color .4s; }
+  /* eller çevirirken adı sarı; sen tutunca beyaza döner */
+  .grup .ayar.oto > span { color: var(--kagit); }
+  .grup .ayar select { grid-column: 2 / 4; }
+  .ayar output { font-variant-numeric: tabular-nums; min-width: 2.2em; font-size: 12px; color: rgba(231, 236, 208, .7); }
+  input[type=range] { width: 120px; accent-color: var(--kagit); }
+  .grup input[type=range] { width: 100%; }
+  select { font: inherit; font-size: 12.5px; color: var(--acik); background: #1c1e15; border: 1px solid rgba(231, 236, 208, .28); border-radius: 6px; padding: 5px 8px; }
+
+  @media (max-width: 640px) {
+    .kagit { margin: 10px 10px 0; }
+    .alt { padding: 0 14px 30px; }
+    .formul { font-size: 14px; }
+    input[type=range] { width: 100px; }
+    .sifirla { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+  <main class="kagit">
+    <div class="ust">
+      <div id="bolum" class="bolum">hazır</div>
+      <div id="bilgi" class="bilgi">x = vuruş · y = perde (oktav)</div>
+    </div>
+    <div class="cizim"><canvas id="grafik"></canvas></div>
+    <div class="alt">
+      <div id="formul" class="formul">
+        <p class="ipucu">Çal'a bas; çalan formül burada yazılacak. Müziğin tamamı bu tek formül.</p>
+      </div>
+      <p id="oyna" class="oyna" hidden>Altı noktalı sayılar oynar: üstünde tekerleği çevir ya da tıkla (⇧ ya da sağ tık geri alır), seçiliyken ↑ ↓. Değişiklik hemen duyulur; kalıcı olsun istersen Kilitle.</p>
+      <div id="sayac" class="sayac"></div>
+    </div>
+  </main>
+
+  <footer class="kontroller">
+    <div class="ana">
+      <button id="cal" class="cal">▶ Çal</button>
+      <button id="kilit" class="kilit" aria-pressed="false" title="Çalan desen tekrar etsin; ayarlarla ve formüldeki sayılarla sen oynat">Kilitle</button>
+      <button id="yeni" class="yeni" title="Hemen yeni bir melodi yolculuğu başlar">Yeni melodi</button>
+      <button id="oto" class="oto" aria-pressed="true" title="Sarı yazılı ayarları müzik bölüme göre kendisi çevirir. Bir sürgüyü tutarsan bıraktıktan sonra da bir süre sende kalır; bıraktığın yer yeni merkezi olur.">Kendi çeviriyor</button>
+      <label class="ayar"><span>Tempo</span><input id="tempo" type="range" min="120" max="150" value="139"><output></output></label>
+      <label class="ayar"><span>Ses</span><input id="ses" type="range" min="0" max="100" value="75"></label>
+      <button id="sifirla" class="sifirla" title="Bütün ayarlar ilk hâline döner">Varsayılana dön</button>
+    </div>
+    <div class="gruplar">
+      <fieldset class="grup">
+        <legend>Acid sesi</legend>
+        <label class="ayar" title="Filtrenin kesimi: sola koyu, sağa parlak"><span>Filtre</span><input id="filtre" type="range" min="-100" max="100" value="0"><output></output></label>
+        <label class="ayar" title="Kesimdeki tepe: sağa doğru daha keskin, daha 'vıyk'"><span>Rezonans</span><input id="rezonans" type="range" min="0" max="100" value="53"><output></output></label>
+        <label class="ayar" title="Her yeni notada filtrenin ne kadar açıldığı"><span>Zarf</span><input id="zarf" type="range" min="0" max="100" value="47"><output></output></label>
+        <label class="ayar" title="Açılan filtrenin ne kadar sürede kapandığı"><span>Kuyruk</span><input id="kuyruk" type="range" min="0" max="100" value="34"><output></output></label>
+        <label class="ayar" title="303'teki accent: vurgulu adımdaki nota daha yüksek, daha parlak ve keskin çalar; vurgular art arda gelince filtre giderek açılır"><span>Vurgu</span><input id="vurgu" type="range" min="0" max="100" value="40"><output></output></label>
+      </fieldset>
+      <fieldset class="grup">
+        <legend>Doku</legend>
+        <label class="ayar" title="Testere (sert, vızıltılı) ile kare (yuvarlak, oyuk) arası"><span>Dalga</span><input id="dalga" type="range" min="0" max="100" value="0"><output></output></label>
+        <label class="ayar" title="303'teki slide: işaretli adımda nota bir öncekinden kayarak gelir ve ona bağlanır; kalıpta ölçüde bir kez, çoğu zaman vurgulu notadan sonra. Sağa doğru daha uzun kayar; sıfırda kayma yok. İlk yolculukta (videodaki) yok"><span>Kayma</span><input id="kayma" type="range" min="0" max="100" value="50"><output></output></label>
+        <label class="ayar" title="Yumuşak kırpma: sesi kalınlaştırır, sertleştirir"><span>Doygunluk</span><input id="doygunluk" type="range" min="0" max="100" value="0"><output></output></label>
+        <label class="ayar" title="Tempoya oturan yankı (noktalı sekizlik), yalnızca melodide"><span>Yankı</span><input id="yanki" type="range" min="0" max="100" value="0"><output></output></label>
+      </fieldset>
+      <fieldset class="grup">
+        <legend>Melodi</legend>
+        <label class="ayar" title="Kendiliğinden: her yolculukta ton değişir"><span>Ton</span><select id="ton"><option value="" selected>kendiliğinden</option><option value="0">C</option><option value="1">C♯</option><option value="2">D</option><option value="3">D♯</option><option value="4">E</option><option value="5">F</option><option value="6">F♯</option><option value="7">G</option><option value="8">G♯</option><option value="9">A</option><option value="10">A♯</option><option value="11">B</option></select></label>
+        <label class="ayar" title="Dizinin rengi: lokryen en karanlık, lidyen en aydınlık"><span>Ruh hali</span><input id="ruh" type="range" min="0" max="100" value="35"><output></output></label>
+        <label class="ayar" title="Dolgu ve üst kat notalarının kaç basamak içinde gezindiği (formüldeki mod F)"><span>Aralık</span><input id="aralik" type="range" min="2" max="12" value="7"><output></output></label>
+        <label class="ayar" title="Formülde kaç terimin açık olduğu: dolgu, hoket, blip, oktav"><span>Yoğunluk</span><input id="yogunluk" type="range" min="0" max="100" value="60"><output></output></label>
+        <label class="ayar" title="Çeşitlemelerin ne sık geldiği: bölüm tekrar ederken (sekiz ölçülük cümlenin ikinci yarısında) desende bir şey değişir; çok açıkken bölüm değişirken de. Sıfırda hiç değişmez"><span>Değişim</span><input id="degisim" type="range" min="0" max="100" value="40"><output></output></label>
+      </fieldset>
+      <fieldset class="grup">
+        <legend>Ritim</legend>
+        <label class="ayar" title="Basın 16 adımlık ritim kalıbı: vurgulu notalar ölçüde hep aynı yere düşer, desen dört ölçü boyunca tekrar eder. Kendiliğinden: her yolculukta başka bir kalıp. Videodaki: 5'li desen ölçünün üstünde kayar (ilk yolculuk böyle)"><span>Kalıp</span><select id="kalip">
+          <option value="" selected>kendiliğinden</option>
+          <option value="tresillo">3+3+2</option>
+          <option value="ikiuc">2+3+3</option>
+          <option value="ara">ara vuruş</option>
+          <option value="once">vuruş öncesi</option>
+          <option value="sonra">vuruş sonrası</option>
+          <option value="uclu">üçlü (ölçü boyu)</option>
+          <option value="altili">6+6+4</option>
+          <option value="besuc">5+3</option>
+          <option value="yedili">7+7+2</option>
+          <option value="video">videodaki (kayan)</option>
+        </select></label>
+        <label class="ayar"><span>Kick</span><input id="kick" type="range" min="0" max="100" value="50"><output></output></label>
+        <label class="ayar"><span>Kick deseni</span><select id="desen">
+          <option value="" selected>bölüme göre</option>
+          <option value="four">dörtlük</option>
+          <option value="bar">ölçü başı</option>
+          <option value="halfFour">yarım, sonra dörtlük</option>
+          <option value="roll">yuvarlanan</option>
+          <option value="none">yok</option>
+        </select></label>
+        <label class="ayar"><span>Hi-hat</span><input id="hat" type="range" min="0" max="100" value="50"><output></output></label>
+        <label class="ayar" title="Hi-hat'in kalıbı. Bölüme göre: ikinci bölümde ara vuruşta açık hat girer, yoğun bölümlerde on altılığa çıkar, cümle sonlarında son vuruşta dolgu yapar"><span>Hat deseni</span><select id="hatDesen">
+          <option value="" selected>bölüme göre</option>
+          <option value="ara">ara vuruş (açık)</option>
+          <option value="sekiz">sekizlik</option>
+          <option value="ardi">ara + ardı</option>
+          <option value="dortnala">dörtnala</option>
+          <option value="onalti">on altılık</option>
+          <option value="kapali">kapalı on altılık</option>
+          <option value="none">yok</option>
+        </select></label>
+        <label class="ayar"><span>Clap</span><input id="clap" type="range" min="0" max="100" value="50"><output></output></label>
+        <label class="ayar" title="Clap'in kalıbı. Bölüme göre: üçüncü bölümde girer, kick susunca susar"><span>Clap deseni</span><select id="clapDesen">
+          <option value="" selected>bölüme göre</option>
+          <option value="geri">2 ve 4</option>
+          <option value="son">2 ve 4 + ön vuruş</option>
+          <option value="dort">yalnız 4</option>
+          <option value="none">yok</option>
+        </select></label>
+        <label class="ayar" title="Videodaki altı bölümden birinde kalabilirsin"><span>Bölüm</span><select id="bolumSec">
+          <option value="" selected>sırayla gezsin</option>
+          <option value="0">bir · sade bas</option>
+          <option value="1">iki · akor</option>
+          <option value="2">üç · dolgu</option>
+          <option value="3">dört · blip, oktav</option>
+          <option value="4">beş · hoket</option>
+          <option value="5">altı · yükseliş</option>
+        </select></label>
+      </fieldset>
+    </div>
+  </footer>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
