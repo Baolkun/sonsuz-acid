@@ -49,7 +49,15 @@ export const PHRASE = 32; // adım
 const cycleAt = (sp, x) => Math.floor((4 * x + sp.q) / (sp.M ? PHRASE : sp.n));
 
 // alt satır: melodi, her an tanımlı
+// şarkı: sekizliğin notası (dizide basamak), bas satırının bir oktav üstünde
+const tuneAt = (sp, x) => mod(Math.floor(2 * (x + 8)), 32);
+
 export function melodyY(sp, x) {
+  if (sp.tune) {
+    let y = (scaleSemi(sp.c, riseAt(sp, x) + sp.tune.T[tuneAt(sp, x)]) + 12 + sp.base) / 12;
+    if (sp.lift !== null) y += Math.max(0, x - sp.lift) / 2;
+    return y;
+  }
   const { b, j } = stepAt(sp, x);
   const K = cycleAt(sp, x);
   // akorlu vurgu notası: kalıpta ölçü ölçü tırmanır, videoda desenin turlarıyla
@@ -93,6 +101,8 @@ function degree(sp, j, K, k) {
 
 // o an vurgulu adımda mı (303'teki accent); hoketin üst katı vurgulanmaz
 export function accentAt(sp, x) {
+  // şarkıda: notanın başladığı on altılıkta, ölçü başıysa ya da perde bir öncekiyle aynıysa
+  if (sp.tune) return mod(Math.floor(4 * (x + 8)), 2) === 0 && sp.tune.A.includes(tuneAt(sp, x));
   const { j } = stepAt(sp, x);
   return j === sp.acc && !(sp.hocket && j % 3 > 0);
 }
@@ -265,17 +275,19 @@ function extras(sp) {
 
 // en: İngilizce (video kaydı için)
 export function renderFormula(sp, en = false) {
-  let mel = bassFrac(sp);
+  let mel = sp.tune ? fr(`${V('S')}(${sp.riser ? `${V('R')} + ` : ''}${V('T')}) + 12 − ${N('base', -sp.base, 'base')}`, 12) : bassFrac(sp);
   if (sp.hocket) mel = brace([[hocketPart(sp), `${IF} ${V('j')} ${MOD} 3 &gt; 0`], [mel]]);
   mel += extras(sp);
   const pad = sp.pad && [fr(`${V('S')}(${V('r')} + 2${V('i')}) + ${N('pad', 24)} − ${N('base', -sp.base, 'base')}`, 12), `${V('i')} ${IN} {0, 1, 2}`];
   const rows = [sp.kick && kickRow(sp), sp.hat && hatRow(sp), sp.perk && perkRow(sp), sp.clap && clapRow(sp), pad].filter(Boolean);
   const main = rows.length ? brace([...rows, [mel]]) : mel;
-  const defs = sp.M
+  const defs = sp.tune
+    ? [`${V('T')} = (${sp.tune.T.join(', ')})[⌊2(${X} + 8)⌋]`]
+    : sp.M
     ? [`${V('b')} = ⌊4${X}⌋ ${MOD} ${N('M', sp.M, 'M')}`, `${V('j')} = (${V('b')} + ${N('p', sp.p, 'p')}) ${MOD} ${N('n', sp.n, 'n')}`]
     : [`${V('j')} = (⌊4${X}⌋ + ${N('p', sp.p, 'p')}) ${MOD} ${N('n', sp.n, 'n')}`];
-  if (sp.fill || sp.hocket || (sp.chord && !sp.M)) defs.push(`${V('K')} = ⌊${fr(`4${X} + ${N('q', sp.q, 'q')}`, sp.M ? PHRASE : N('n', sp.n, 'n'))}⌋`);
-  if (sp.chord) defs.push(sp.M ? `${V('k')} = ⌊${fr(`${X} + 8`, 4)}⌋` : `${V('k')} = ${V('K')} ${MOD} 4`);
+  if (sp.fill || sp.hocket || (sp.chord && !sp.M && !sp.tune)) defs.push(`${V('K')} = ⌊${fr(`4${X} + ${N('q', sp.q, 'q')}`, sp.M ? PHRASE : N('n', sp.n, 'n'))}⌋`);
+  if (sp.chord && !sp.tune) defs.push(sp.M ? `${V('k')} = ⌊${fr(`${X} + 8`, 4)}⌋` : `${V('k')} = ${V('K')} ${MOD} 4`);
   if (sp.slide) defs.push(`${V('d')}(${V('j')}) = ${degreeExpr(sp)}`, `Δ = ${dj(sp, `${V('j')} − 1`)} − ${dj(sp, V('j'))}`);
   if (sp.hat || sp.perk?.ses === 'shaker') defs.push(`${V('u')} = ${FRAC}(4${X}) − ${SWING}(⌊4${X}⌋ ${MOD} 2)`);
   if (sp.hat) {

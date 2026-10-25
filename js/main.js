@@ -463,6 +463,11 @@ $('kalip').addEventListener('change', () => {
   besteci.settings.kalip = id;
   if (id) liveEdit((s) => besteci.useKalip(s, id), ['M', 'n', 'p', 'acc', 'bend', 'slide']);
 });
+// şarkı seçilince çalan sayfa hemen o melodiyle yeniden yazılır
+$('sarki').addEventListener('change', () => {
+  besteci.settings.sarki = $('sarki').value || null;
+  liveEdit(() => {}, ['prog']);
+});
 $('bolumSec').addEventListener('change', () => {
   const v = $('bolumSec').value;
   besteci.settings.stage = v === '' ? null : Number(v);
@@ -592,6 +597,10 @@ st.clap = $('clapDesen').value || null;
 st.perk = $('perkDesen').value || null;
 st.stage = $('bolumSec').value === '' ? null : num('bolumSec');
 st.kalip = $('kalip').value || null;
+// ?sarki=tetris adresi şarkıyla açar (paylaşılan bağlantı)
+const sarkiQ = new URLSearchParams(location.search).get('sarki');
+if (sarkiQ && [...$('sarki').options].some((o) => o.value === sarkiQ)) $('sarki').value = sarkiQ;
+st.sarki = $('sarki').value || null;
 besteci.s.c = besteci.moodC();
 if (st.key !== null) besteci.s.base = besteci.keyBase(st.key);
 bpm = num('tempo');

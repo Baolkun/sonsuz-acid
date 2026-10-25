@@ -72,6 +72,9 @@ export const EN = {
   'Kendiliğinden: her yolculukta ton değişir': 'Automatic: the key changes every journey',
   'Ton': 'Key',
   'kendiliğinden': 'automatic',
+  'Bilinen bir melodiyi nota nota çalar: melodinin ilk yarısı bir sayfa, ikinci yarısı öbür sayfa; drop hep melodinin başına düşer. Davul, akorlar, yükseliş ve ton yine bestecinin. Kendiliğinden: besteci kendi melodisini yazar':
+    'Plays a well-known melody note by note: the first half of the melody on one page, the second half on the next; the drop always lands on the start of the melody. Drums, chords, the rise and the key still come from the composer. Automatic: the composer writes its own melody',
+  'Şarkı': 'Song',
   'Dizinin rengi: lokryen en karanlık, lidyen en aydınlık': 'The color of the scale: Locrian is the darkest, Lydian the brightest',
   'Ruh hali': 'Mood',
   'Dolgu ve üst kat notalarının kaç basamak içinde gezindiği (formüldeki mod F)': 'How many scale steps the fill and upper-layer notes wander within (mod F in the formula)',

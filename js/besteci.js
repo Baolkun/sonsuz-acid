@@ -65,6 +65,32 @@ export const PERKLER = {
   tom: { ad: 'tom (cümle sonu)', ses: 'tom', m: 32, on: [26, 29, 30], kat: 2, w: 2 },
   tomIki: { ad: 'tom (yarım ölçü)', ses: 'tom', m: 16, on: [10, 14], kat: 2, w: 1 },
 };
+// Şarkılar: bilinen bir melodi notası notasına çalar (bas satırının yerine). Notalar dizide basamak (0 tonik), her biri
+// [basamak, kaç sekizlik]; iki sayfa: 1. sayfa melodinin ilk dört ölçüsü, 2. sayfa son dört ölçüsü. prog her sayfanın
+// akor kökleri (pad ve kick'in altı), c dizinin modu (melodi o modda yazıldı). Telifi dolmuş melodiler
+export const SARKILAR = {
+  tetris: {
+    ad: 'Tetris (Korobeiniki)', c: 2,
+    sayfalar: [
+      [[4, 2], [1, 1], [2, 1], [3, 2], [2, 1], [1, 1], [0, 2], [0, 1], [2, 1], [4, 2], [3, 1], [2, 1],
+        [1, 3], [2, 1], [3, 2], [4, 2], [2, 2], [0, 2], [0, 4]],
+      [[3, 3], [5, 1], [7, 2], [6, 1], [5, 1], [4, 3], [2, 1], [4, 2], [3, 1], [2, 1],
+        [1, 2], [1, 1], [2, 1], [3, 2], [4, 2], [2, 2], [0, 2], [0, 4]],
+    ],
+    prog: [[4, 0, 4, 0], [3, 2, 4, 0]],
+  },
+};
+// şarkının bir sayfası: T her sekizliğin basamağı (32), A notanın başladığı sekizliklerden yeniden vurulanlar (ölçü başı ya
+// da bir öncekiyle aynı perde: 303'te perde değişmeden nota ancak vurguyla yeniden vurulur)
+function tunePage(song, half) {
+  const T = [];
+  const A = [];
+  for (const [d, len] of song.sayfalar[half]) {
+    if (T.length % 8 === 0 || T[T.length - 1] === d) A.push(T.length);
+    for (let i = 0; i < len; i++) T.push(d);
+  }
+  return { T, A };
+}
 // tema: melodiyi yapan sayılar. Yolculuğun üçüncü bölümünde (melodi ilk kez tam otururken) saklanır, desen sonra
 // değişe değişe başka yerlere gider; kırılma ve yükselişten sonra drop'ta tema olduğu gibi geri döner (parçanın
 // "kanca"sı), ardından yine çeşitlenir
@@ -121,7 +147,7 @@ export class Besteci {
   constructor(seed) {
     this.rng = createRng(seed);
     // kullanıcının ayarları; stage, kick ve key null ise besteci kendisi seçer
-    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null };
+    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null };
     this.locked = false;
     this.newWanted = false;
     this.wantRoll = false; // elle istenen dolgu: sonraki sayfada
@@ -288,8 +314,8 @@ export class Besteci {
     s.prog[i] = this.rng.pick([-2, -1, 1, 2, 3, 4].filter((d) => d !== s.prog[i]));
   }
 
-  // sayfanın formülü: durum + bölümün terimleri + kullanıcının seçtikleri
-  build(stage, s) {
+  // sayfanın formülü: durum + bölümün terimleri + kullanıcının seçtikleri. half: şarkı çalarken melodinin hangi yarısı
+  build(stage, s, half = 0) {
     const st = this.settings;
     const f = features(stage, st.density);
     const type = st.kick ?? f.kick;
@@ -309,7 +335,7 @@ export class Besteci {
     const C = CLAPLAR[st.clap ?? (f.clap && kick ? s.clap : null)];
     const P = PERKLER[st.perk ?? (f.perk ? s.perk[f.perk - 1] : null)];
     const enter = (key) => (!st[key] && s.enter?.[key] ? 0 : null);
-    return {
+    const sp = {
       kick, M: s.M, n: s.n, p: s.p, q: s.q, acc: s.acc, bend: s.bend, slide, base: s.base, c: s.c, F: st.F, prog: s.prog.slice(),
       chord: f.chord, fill: f.fill ? { ...s.fill } : null, hocket: f.hocket ? { ...s.hocket } : null,
       blip: f.blip ? s.blip : 0, oct, riser: f.riser ? { w: s.riser } : null, lift: f.lift ? s.lift : null,
@@ -320,20 +346,28 @@ export class Besteci {
       gap: !!s.gap,
       pad: f.pad ? { lvl: f.pad } : null,
     };
+    // şarkı: melodi notaları listeden okur; bas satırının kalıbı, dolgusu, hoketi, kayması susar, akorlar şarkınınki
+    const song = SARKILAR[st.sarki];
+    if (song) {
+      Object.assign(sp, { c: song.c, prog: song.prog[half].slice(), tune: tunePage(song, half), bend: null, slide: null,
+        chord: false, fill: null, hocket: null, blip: 0, oct: false });
+    }
+    return sp;
   }
 
   // sayfanın formülünü ve yazılarını sakladığı durumdan (yeniden) kurar
   dress(page) {
     const stage = this.settings.stage ?? page.stage;
     const { s } = page.snap;
-    page.sp = this.build(stage, s);
+    // şarkıda yolculuğun son sayfası melodinin ikinci yarısı: drop hep melodinin başına düşer
+    page.sp = this.build(stage, s, mod(page.count - page.index + 1, 2));
     page.name = NAMES[stage] + (s.drop ? ' · drop' : '') + (s.geri ? ' · tema geri' : '');
     page.drop = !!s.drop;
     page.key = noteName(52 + s.base);
     page.mode = MODE_NAMES[s.c];
     // kalıbın adı; desenin sayıları elle değiştiyse yok
     const k = KALIPLAR[s.kalip];
-    page.kalip = k && k.n === s.n && k.M === s.M && k.p === s.p ? k.ad : null;
+    page.kalip = page.sp.tune ? SARKILAR[this.settings.sarki].ad : k && k.n === s.n && k.M === s.M && k.p === s.p ? k.ad : null;
     page.hat = page.sp.hat ? HATLAR[this.settings.hat ?? s.hat[features(stage, this.settings.density).hat - 1]]?.ad ?? null : null;
     page.clap = page.sp.clap ? CLAPLAR[this.settings.clap ?? s.clap].ad : null;
     page.perk = page.sp.perk ? PERKLER[this.settings.perk ?? s.perk[features(stage, this.settings.density).perk - 1]]?.ad ?? null : null;
