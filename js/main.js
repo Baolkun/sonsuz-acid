@@ -4,12 +4,12 @@
 // Ayarlar tarayıcıda saklanır.
 
 import { Besteci, PAGE, slideK } from './besteci.js?v=b99ee1c0';
-import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js?v=2a4d8fb9';
+import { Eller, KNOBS, RENKLER, TINILAR } from './eller.js?v=7e56b7de';
 import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=c2f8e7f5';
 import { Ses } from './ses.js?v=81aff5d3';
-import { View } from './view.js?v=57e97d96';
-import { Kayit } from './kayit.js?v=37e277b8';
-import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=3b770df9';
+import { View } from './view.js?v=11031eb6';
+import { Kayit } from './kayit.js?v=b88d942a';
+import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=891f1e18';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
@@ -95,6 +95,7 @@ function automate() {
   if (moved) ses.params(soundParams());
   // kayma formüle yazılır: çalan sayfa değişmez, sıradaki sayfa yeni kaymayla yazılır
   besteci.settings.slide = num('kayma');
+  besteci.settings.glitch = num('glitch') / 100;
 }
 
 function setOto(on) {
