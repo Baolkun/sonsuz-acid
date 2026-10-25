@@ -350,9 +350,11 @@ export class Besteci {
     const f = features(eff, settings.density);
     // aynı bölüm kaçıncı sayfadır çalıyor
     const run = !fresh && prev && prev.eff === eff ? prev.run + 1 : 1;
-    // hat dolgusu cümle sonunda: bölüm değişmeden önceki çift sayfada (sekiz ölçü bitti) ya da yolculuğun son sayfasında
+    // hat dolgusu cümle sonunda: bölüm değişmeden önceki çift sayfada (sekiz ölçü bitti), yolculuğun son sayfasında ya da
+    // kırılmadan önce (en büyük düşüş habersiz gelince kesik gibi duyuluyor)
     const after = this.plan[this.at + 1];
-    s.roll = this.wantRoll || (f.hat > 1 && (after === undefined || (run % 2 === 0 && (settings.stage ?? after) !== eff)));
+    const kirilmaOncesi = settings.stage === null && after === 6 && eff !== 6;
+    s.roll = this.wantRoll || (f.hat > 1 && (after === undefined || kirilmaOncesi || (run % 2 === 0 && (settings.stage ?? after) !== eff)));
     this.wantRoll = false;
     // drop: yükselişten sonra beşinci bölüm; yükselişin son yarım vuruşu sessiz kalır (drop öncesi boşluk)
     s.drop = settings.stage === null && !fresh && prev?.eff === 5 && eff === 4;
