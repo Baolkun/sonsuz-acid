@@ -79,11 +79,10 @@ function automate() {
     // bölümün kaçıncı sayfası (tekrarında başka hareket); kilitliyken sayfa döndükçe hareketler sırayla değişir
     variant: besteci.locked ? page.no : (page.snap.prev?.run ?? 1) - 1,
   });
-  if (eller.plans.renk !== renk || eller.plans.tini !== tini) {
-    renk = eller.plans.renk;
-    tini = eller.plans.tini;
-    showInfo(page);
-  }
+  // renk ve tını sayfaya yazılır; kâğıt sayfa duyulunca (ekrana gelince) boyanır. Eller sesten önde çalışır: ses
+  // kartının gecikmesi kadar önce çevirir, kâğıt onunla değişirse sayfa çevrilmeden renk döner
+  page.look = { renk: eller.plans.renk, tini: eller.plans.tini };
+  if (page === shown && (page.look.renk !== renk || page.look.tini !== tini)) showInfo(page);
   let moved = false;
   for (const id in values) {
     const el = $(id);
@@ -193,11 +192,12 @@ function hamle(kind) {
   flash(`${kind}Btn`, cur.beat + PAGE - beatNow());
 }
 
-let renk = null; // ellerin bu sayfaya verdiği renk
+let renk = null; // ellerin ekrandaki sayfaya verdiği renk
 let tini = null; // ve acid sesinin tınısı
 // bilgi satırına giden renk ve tını adları (Türkçe asılları; dil.js çevirir)
 const looks = () => ({ bpm, renk: oto && renk ? RENKLER[renk].ad : null, tini: oto && tini ? TINILAR[tini].ad : null });
 function showInfo(page) {
+  if (page.look) ({ renk, tini } = page.look);
   // kâğıt da sayfanın rengini alır
   if (oto && renk) document.querySelector('.kagit').style.setProperty('--kagit', RENKLER[renk].kagit);
   else document.querySelector('.kagit').style.removeProperty('--kagit');
