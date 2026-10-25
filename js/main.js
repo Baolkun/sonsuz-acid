@@ -8,6 +8,7 @@ import { Eller, KNOBS, RENKLER } from './eller.js';
 import { renderFormula, MODE_NAMES, mod } from './formula.js';
 import { Ses } from './ses.js';
 import { View } from './view.js';
+import { Kayit } from './kayit.js';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
@@ -16,6 +17,7 @@ const num = (id) => Number($(id).value);
 const besteci = new Besteci((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
 const view = new View($('grafik'));
 const eller = new Eller();
+const kayit = new Kayit(document.querySelector('.kagit'));
 let oto = true; // acid ayarlarını eller çeviriyor
 
 let ctx = null;
@@ -235,6 +237,11 @@ function frame() {
   const page = pages.find((p) => beat >= p.beat && beat < p.beat + PAGE) || pages[0];
   if (page !== shown) showPage(page);
   view.draw(page, beat - page.beat - 8);
+  if (kayit.active) {
+    kayit.draw(page, beat - page.beat - 8, $('bolum').textContent, $('bilgi').textContent);
+    const t = Math.floor(kayit.seconds);
+    $('kayitBtn').textContent = `■ Bitir ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  }
 }
 requestAnimationFrame(frame);
 
@@ -254,12 +261,14 @@ async function toggle() {
     playing = false;
     frozenT = audioNow();
     ticker.postMessage(false);
+    kayit.pause(true);
     await ctx.suspend();
   } else {
     await ctx.resume();
     playing = true;
     ticker.postMessage(true);
     compose();
+    kayit.pause(false);
   }
   busy = false;
   $('cal').textContent = playing ? '❚❚ Durdur' : '▶ Çal';
@@ -325,6 +334,20 @@ document.addEventListener('keydown', (e) => {
 $('dolguBtn').addEventListener('click', () => playing && dolgu());
 $('kirilmaBtn').addEventListener('click', () => playing && hamle('kirilma'));
 $('dropBtn').addEventListener('click', () => playing && hamle('drop'));
+// video: çalmıyorsa çalmaya da başlar; ikinci basış kaydı bitirip dosyayı indirir
+$('kayitBtn').addEventListener('click', async () => {
+  if (busy) return;
+  const btn = $('kayitBtn');
+  if (kayit.active) {
+    await kayit.stop();
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = '● Video kaydet';
+    return;
+  }
+  if (!playing) await toggle();
+  kayit.start(ses.stream());
+  btn.setAttribute('aria-pressed', 'true');
+});
 $('tempo').addEventListener('input', () => {
   bpm = num('tempo');
   if (shown) showInfo(shown);

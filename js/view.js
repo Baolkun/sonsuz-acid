@@ -12,16 +12,18 @@ const RED = '#e2332a';
 const STEP = 1 / 64; // eğri bu sıklıkta örneklenir (vuruş)
 
 export class View {
-  constructor(canvas) {
+  // size: sayfada olmayan tuval için sabit boyut { width, height, dpr } (video kaydı)
+  constructor(canvas, size = null) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
+    this.size = size;
     this.resize();
-    new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
+    if (!size) new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
   }
 
   resize() {
-    const r = this.canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
+    const r = this.size || this.canvas.getBoundingClientRect();
+    const dpr = this.size ? this.size.dpr : window.devicePixelRatio || 1;
     this.w = r.width;
     this.h = r.height;
     this.canvas.width = Math.round(r.width * dpr);
