@@ -199,13 +199,16 @@ export class Kayit {
     g.fillText(SOZ[this.lang].alt, W / 2, H - 64);
     g.font = `13px ${MATH}`;
     g.fillText('baolkun.github.io/sonsuz-acid', W / 2, H - 42);
+    this.track.requestFrame?.();
   }
 
   start(audio) {
     // hiç boyanmamış tuvalden alınan görüntü izi boş kalıyor (Chrome): önce kâğıt
     this.g.fillStyle = getComputedStyle(this.kagit).backgroundColor;
     this.g.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    const video = this.canvas.captureStream(30);
+    // kare hızı 0: kareyi her çizimden sonra biz isteriz (arka plandaki sekmede kendiliğinden yakalanmıyor)
+    const video = this.canvas.captureStream(0);
+    this.track = video.getVideoTracks()[0];
     const stream = new MediaStream([...video.getVideoTracks(), ...audio.getAudioTracks()]);
     const mimeType = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
     this.rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8e6, audioBitsPerSecond: 192e3 });

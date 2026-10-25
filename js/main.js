@@ -56,6 +56,7 @@ const ticker = new Worker(URL.createObjectURL(new Blob(
 ticker.onmessage = () => {
   compose();
   automate();
+  shoot();
 };
 
 const beatNow = () => (ctx && clocks.length ? beatAt(ctx.currentTime) : 0);
@@ -242,12 +243,23 @@ function frame() {
   const page = pages.find((p) => beat >= p.beat && beat < p.beat + PAGE) || pages[0];
   if (page !== shown) showPage(page);
   view.draw(page, beat - page.beat - 8);
-  if (kayit.active) {
-    kayit.lang = $('kayitDil').value;
-    kayit.draw(page, beat - page.beat - 8, { tr: $('bilgi').textContent, bpm, renk: oto && renk, tini: oto && tini });
-    const t = Math.floor(kayit.seconds);
-    $('kayitBtn').textContent = `■ Bitir ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-  }
+}
+
+// videonun karesi: ekran çiziminden (requestAnimationFrame) değil işçinin zamanlayıcısından, çünkü sekme arka plandayken
+// tarayıcı ekran çizimini durdurur, ses ise sürer
+let shot = 0;
+function shoot() {
+  if (!kayit.active || !pages.length) return;
+  const now = performance.now();
+  if (now - shot < 30) return; // saniyede ~30 kare
+  shot = now;
+  const beat = beatAt(audioNow());
+  const page = pages.find((p) => beat >= p.beat && beat < p.beat + PAGE) || pages[0];
+  if (page !== shown) showPage(page);
+  kayit.lang = $('kayitDil').value;
+  kayit.draw(page, beat - page.beat - 8, { tr: $('bilgi').textContent, bpm, renk: oto && renk, tini: oto && tini });
+  const t = Math.floor(kayit.seconds);
+  $('kayitBtn').textContent = `■ Bitir ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 requestAnimationFrame(frame);
 
