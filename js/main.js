@@ -93,7 +93,10 @@ function automate() {
 
 function setOto(on) {
   oto = on;
-  if (!on) renk = null;
+  if (!on) {
+    renk = null;
+    if (shown) showInfo(shown);
+  }
   $('oto').setAttribute('aria-pressed', String(on));
   $('oto').textContent = on ? 'Kendi çeviriyor' : 'Kendi çevirsin';
   if (on) eller.start(knobValues());
@@ -153,6 +156,9 @@ function newJourney() {
 let renk = null; // ellerin bu sayfaya verdiği renk
 function showInfo(page) {
   const r = oto && renk ? ` · renk: ${RENKLER[renk].ad}` : '';
+  // kâğıt da sayfanın rengini alır
+  if (oto && renk) document.querySelector('.kagit').style.setProperty('--kagit', RENKLER[renk].kagit);
+  else document.querySelector('.kagit').style.removeProperty('--kagit');
   $('bilgi').textContent = `${page.key} ${page.mode} · ${bpm} BPM · yolculuk ${page.journey}${page.kalip ? ` · ${page.kalip}` : ''}${r}`;
 }
 
