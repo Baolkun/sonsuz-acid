@@ -161,7 +161,24 @@ function showPage(page) {
   for (const el of box.querySelectorAll('.p')) if (page.changed.includes(el.dataset.k) || page.changed.includes(el.dataset.e)) el.classList.add('degisti');
   if (focused) box.querySelector(`[data-e="${focused}"]`)?.focus({ preventScroll: true });
   $('oyna').hidden = false;
+  fitFormula();
 }
+
+// formül kutusuna sığana kadar yazı küçülür; satırlar çoğalınca grafik ezilmez, sayfa kaymaz. Dar ekranda okunmayacak
+// kadar küçülmez, kutu kaydırılır
+function fitFormula() {
+  const box = $('formul');
+  const over = () => box.scrollHeight > box.clientHeight + 1 || box.scrollWidth > box.clientWidth + 1;
+  box.style.fontSize = '';
+  box.style.overflow = '';
+  let size = parseFloat(getComputedStyle(box).fontSize);
+  while (size > 11 && over()) {
+    size -= 0.5;
+    box.style.fontSize = `${size}px`;
+  }
+  if (over()) box.style.overflow = 'auto';
+}
+new ResizeObserver(() => { if (shown) fitFormula(); }).observe($('formul').parentElement);
 
 function frame() {
   requestAnimationFrame(frame);
