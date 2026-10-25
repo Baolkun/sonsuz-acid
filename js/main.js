@@ -3,12 +3,12 @@
 // sonraki sayfalar da oradan devam eder. "Kendi çeviriyor" açıkken acid ayarlarını eller çevirir (eller.js).
 // Ayarlar tarayıcıda saklanır.
 
-import { Besteci, PAGE, slideK } from './besteci.js?v=f9abc5ad';
+import { Besteci, PAGE, slideK } from './besteci.js?v=119cb26b';
 import { Eller, KNOBS, RENKLER, TINILAR, seedEller } from './eller.js?v=2aa49873';
-import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=cc1b4452';
-import { Ses } from './ses.js?v=c739ac9b';
-import { View } from './view.js?v=7c7ab37b';
-import { Kayit } from './kayit.js?v=6e29ad8f';
+import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=30fd0702';
+import { Ses } from './ses.js?v=995871fd';
+import { View } from './view.js?v=36522337';
+import { Kayit } from './kayit.js?v=7de2c7ee';
 import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=bc423345';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
@@ -57,18 +57,17 @@ function timeAt(beat) {
 const DJ_TEMPO = { amen: 165, techno: 140 };
 const djTempo = (tur) => TURLER[tur]?.tempo || DJ_TEMPO[tur ?? 'techno'];
 let rampAt = null; // tempo geçişinin kurulduğu sayfanın vuruşu
-// DJ seti: tür değişen sayfa boyunca tempo yeni türünkine kayar (dört ölçüde, yumuşak), DJ'in pitch'i itmesi gibi
+// DJ seti: tür değişen sayfanın başından dört ölçü boyunca tempo yeni türünkine kayar (yumuşak), DJ'in pitch'i
+// itmesi gibi. Sayfa çalmaya başladıysa (yeni yolculuk elle) geçiş şimdiden başlar, yine dört ölçü sürer
 function djRamp(page, prev) {
   if (!besteci.settings.dj || !prev || page.tur === prev.tur || rampAt === page.beat) return;
   rampAt = page.beat;
-  // sayfa çalmaya başladıysa (yeni yolculuk elle) geçiş şimdiden sayfa sonuna
   const b0 = Math.max(page.beat, Math.ceil(beatAt(ctx.currentTime + 0.1)));
   const from = clocks.findLast((c) => c.beat <= b0)?.bpm ?? bpm;
   const to = djTempo(page.tur);
   if (from === to) return;
-  const L = page.beat + PAGE - b0;
-  for (let b = b0; b <= page.beat + PAGE; b++) {
-    const u = L > 0 ? (b - b0) / L : 1;
+  for (let b = b0; b <= b0 + PAGE; b++) {
+    const u = (b - b0) / PAGE;
     addClock({ time: timeAt(b), beat: b, bpm: Math.round(10 * (from + (to - from) * (0.5 - 0.5 * Math.cos(Math.PI * u)))) / 10 });
   }
 }
@@ -584,6 +583,14 @@ function setTur(v) {
   const was = besteci.tur(liveState());
   st.dj = v === 'dj';
   st.amen = st.dj ? null : v || null;
+  // DJ setinden çıkınca yarım kalan tempo geçişi olduğu yerde durur
+  if (!st.dj && ctx && clocks.length && clocks[clocks.length - 1].time > ctx.currentTime) {
+    const time = ctx.currentTime + 0.05;
+    bpm = Math.round(clocks.findLast((c) => c.time <= time)?.bpm ?? bpm);
+    addClock({ time, beat: beatAt(time), bpm });
+    $('tempo').value = bpm;
+    showValue($('tempo'));
+  }
   if (st.dj) {
     liveEdit((s) => { s.tur = was; s.djN = 0; });
     $('amen').querySelector('option[value="dj"]').textContent = t('DJ seti');
@@ -716,10 +723,14 @@ box.addEventListener('keydown', (e) => {
 // ---------- başlangıç ----------
 
 load();
-// paylaşılan bağlantı: içindeki ayarlar kayıtlı olanların üstüne biner
+// paylaşılan bağlantı: ayarlar varsayılandan başlar, bağlantıdakiler üstüne biner (açanın kayıtlı ayarları şarkıyı
+// değiştirmesin); ses düzeyi ve dil açanınki kalır
 if (URLQ.has('tohum')) {
-  for (const el of controls) if (URLQ.has(el.id)) el.value = URLQ.get(el.id);
-  if (URLQ.get('oto') === '0') oto = false;
+  for (const el of controls) {
+    if (['ses', 'dil', 'kayitDil'].includes(el.id)) continue;
+    el.value = URLQ.has(el.id) ? URLQ.get(el.id) : el.tagName === 'SELECT' ? ([...el.options].find((o) => o.defaultSelected) ?? el.options[0]).value : el.defaultValue;
+  }
+  oto = URLQ.get('oto') !== '0';
 }
 // kayıtlı dil yoksa tarayıcının dili: Türkçe değilse İngilizce
 const saved = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } })();

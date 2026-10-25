@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, TURLER, mod } from './formula.js?v=cc1b4452';
+import { MODE_NAMES, TURLER, KIRIKLAR, mod } from './formula.js?v=30fd0702';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
@@ -111,6 +111,7 @@ export const DJ_YOL = {
   speed: ['terror', 'core'],
 };
 export const DJ_TUR_YOLCULUK = 2; // tür kaç yolculukta bir değişir
+export const KIRIK_PAY = [0, 0, 1, 2, 3, 4]; // KIRIKLAR: jungle ve breakcore'da yolculuğun break'i (Amen iki pay)
 export const AMEN_DUZ = { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] };
 export const RHO = [16, 8, 4, 2, 1];
 // şarkının bir sayfası: T her sekizliğin basamağı (32), A notanın başladığı sekizliklerden yeniden vurulanlar (ölçü başı ya
@@ -195,7 +196,7 @@ export class Besteci {
       kalip: 'video', M: null, n: 5, p: 2, q: 32, acc: 2, bend: 4, slide: null, base: -18, c: 2, prog: [0, 0, 0, 0],
       fill: { u: 3, v: 6 }, hocket: { u: 3, v: 1, chirp: 0.4 }, kick: { at: 4, L: 4 }, lift: 6, riser: 3, blip: 0.25,
       hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false, tema: null, geri: false,
-      amen: clone(AMEN_DUZ), son: false, glitch: [], tur: null, djN: 0, djEski: null,
+      amen: clone(AMEN_DUZ), son: false, glitch: [], tur: null, djN: 0, djEski: null, brk: 0,
     };
   }
 
@@ -317,7 +318,11 @@ export class Besteci {
       s.tur = t === 'techno' ? null : t;
       changed.add('amen');
     }
-    if (TURLER[this.tur(s)]?.dogra) this.useDograma(s);
+    if (TURLER[this.tur(s)]?.dogra) {
+      this.useDograma(s);
+      // her yolculuk başka bir break (ilki Amen; Amen'in payı iki kat, aynısı üst üste gelmez)
+      if (this.journey > 1) s.brk = rng.pick(KIRIK_PAY.filter((b) => b !== (s.brk ?? 0)));
+    }
     if (this.journey === 1) {
       this.plan = [0, 1, 2, 3, ...ENDING];
       // kalıp seçildiyse ilk yolculuk da onunla çalar
@@ -439,7 +444,7 @@ export class Besteci {
     const tur = this.tur(s);
     if (tur && kick) {
       const T = TURLER[tur];
-      const a = { ...clone(T.dogra && s.drop ? AMEN_DUZ : s.amen), tur };
+      const a = { ...clone(T.dogra && s.drop ? AMEN_DUZ : s.amen), tur, brk: T.dogra ? s.brk ?? 0 : null };
       if (s.gap) a.rho = T.sert ? [16, 16, 16, 16, 8, 4, 2, 1] : [16, 16, 16, 16, 16, 16, 8, 4];
       else if (s.roll || s.son) {
         a.rho[7] = T.sert ? 1 : 8;
@@ -467,6 +472,7 @@ export class Besteci {
     page.key = noteName(52 + s.base);
     page.mode = MODE_NAMES[s.c];
     page.tur = this.tur(s);
+    page.brk = page.sp.amen?.brk ? KIRIKLAR[page.sp.amen.brk].ad : null;
     // kalıbın adı; desenin sayıları elle değiştiyse yok
     const k = KALIPLAR[s.kalip];
     page.kalip = page.sp.tune ? SARKILAR[this.settings.sarki].ad : k && k.n === s.n && k.M === s.M && k.p === s.p ? k.ad : null;

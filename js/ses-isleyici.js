@@ -37,7 +37,7 @@
 // var, aynı kanalda yeni vuruş eskisini birkaç milisaniyede keser; Amen kaydı kalıbın her vuruşunda kaydın o on
 // altılığından başlar (tempoya göre hızlanır, jungle'daki gibi perdesi de kalkar), sonraki vuruşa kadar akar.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=cc1b4452';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=30fd0702';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -303,7 +303,8 @@ class FormulSes extends AudioWorkletProcessor {
     if (S.brk) {
       const buf = smp[S.brk];
       const at = S.dilim ? (S.dilim[h.i % S.n] / 1000) * sampleRate : ((h.i % S.n) * buf.length) / S.n;
-      this.play('B', buf, h.vel, bpm / S.bpm, Math.floor(at));
+      this.play('B', buf, h.vel * (S.g ?? 1), bpm / S.bpm, Math.floor(at));
+      if (S.son) this.vox.B.stop = (S.son[h.i % S.n] / 1000) * sampleRate;
       return true;
     }
     const ch = h.ch;
@@ -321,7 +322,7 @@ class FormulSes extends AudioWorkletProcessor {
     if (!buf) return;
     const old = this.vox[ch];
     if (old) this.olds.push(old);
-    this.vox[ch] = { ch, buf, pos: from, rate, gain: gain * SMP_GAIN[kind], drive, cut: 1, end: false };
+    this.vox[ch] = { ch, buf, pos: from, rate, gain: gain * SMP_GAIN[kind], drive, cut: 1, end: false, stop: Infinity };
   }
 
   // bir örneğin bu andaki değeri (doğrusal ara değer); kesilen ses söner
@@ -335,7 +336,9 @@ class FormulSes extends AudioWorkletProcessor {
     v.pos += v.rate;
     if (v.drive) y = Math.tanh(v.drive * y) / Math.tanh(v.drive);
     y *= v.gain;
-    if (cutStep) v.cut -= v.cut * cutStep;
+    // dilim, kalıbın sıradaki vuruşunun başladığı yerde söner (kayıt akarken o vuruşa erken varıp ikilemesin)
+    const fade = cutStep || (v.pos >= v.stop ? 1 / (SMP_CUT * sampleRate) : 0);
+    if (fade) v.cut -= v.cut * fade;
     return y * v.cut;
   }
 
@@ -551,10 +554,16 @@ class FormulSes extends AudioWorkletProcessor {
           this.bt = bt;
           const h = breakAt(sp, x);
           if (h && this.sampled(h, clock.bpm)) {
-            // pompa örnek kick'le de çalışır; sentez kick'i sessiz
+            // pompa örnek kick'le de çalışır; sentez kick'i sessiz (kaydın kick'i yoksa o da vurur)
             if ('KXBZ'.includes(h.ch)) {
               this.bkAge = 0;
               this.bkVel = 0;
+              if (h.T.ses.kat) {
+                this.bkPh = 0;
+                this.bkVel = h.vel;
+                this.bkK = h.T.kik;
+                this.bkHz = KICK_HZ * 2 ** ((sp.base + 12) / 12);
+              }
             }
           } else if (h) {
             if ('KXBZ'.includes(h.ch)) {

@@ -170,7 +170,7 @@ const REC = { ...UZU, brk: 'uzu/10_break_amen_pprocessed', bpm: 165, n: 32, dili
 const SEKIZ = { kg: 0.75, K: '808/bd0050', S: '808/sd0050', C: '808/cp', h: '808/ch', o: '808/oh25', r: '808/cy0000', X: '808/cy0000' };
 const SERT = (bozuk, kg) => ({ ...UZU, K: 'uzu/10_bd_switchangel', S: 'uzu/12_sd_switchangel_2', bozuk, kg });
 // davul seslerinin dosyaları (ses.js yükler)
-export const SES_DOSYALARI = () => [...new Set(Object.values(TURLER).flatMap((T) => Object.entries(T.ses).filter(([k]) => !['bpm', 'n', 'bozuk', 'kg', 'dilim'].includes(k)).map(([, v]) => v)))];
+export const SES_DOSYALARI = () => [...new Set([...Object.values(TURLER), ...KIRIKLAR].flatMap((T) => Object.entries(T.ses).filter(([k]) => !['bpm', 'n', 'bozuk', 'kg', 'dilim', 'son', 'g', 'kat'].includes(k)).map(([, v]) => v)))];
 const KIK = { drive: 1.8, decay: 0.16, sweep: 3, st: 0.012, gain: 1.2 };
 // mathcore: yedi adımlık hücre (kick, snare, hayalet) ve beş adımda bir hat; 7'ye 5 dört ölçü boyunca kayar
 // mathcore: ölçü tek sayılı gruplara bölünür (7 + 5 + 4, 5 + 5 + 6, 3 + 3 + 3 + 3 + 4); her grup vurguyla açılır, her ölçü
@@ -214,14 +214,40 @@ export const TURLER = {
     ad: 'mathcore', A: groups(MATH, 0), Q: groups(MATH, 1), ses: UZU, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
   },
 };
-export const AMEN_H = { K: 0.5, X: 0.5, B: 0.5, Z: 0.5, S: 0.35, C: 0.35, s: 0.15, r: 0.08 }; // grafikte vuruşun boyu (r: yalnız metal)
+// Jungle ve breakcore'da her yolculuk bir break çalar (KIRIKLAR[0] Amen). Dördü tidalcycles/Dirt-Samples'tan; her biri
+// ölçülüp (tempo, ölçü başı, her on altılığın vuruşunun başladığı yer, ms) Amen gibi vuruşlarından kesildi. A ölçülen
+// vuruşlar: K kick, S snare, s hayalet, h hat (yalnız kaydı yeniden başlatır, kayıt ızgaradan kaymasın). g: düzey (tepesi
+// eşit ama ortalaması düşük kayıtlar), kat: kaydın kick'i yok, K'lerde türün kick'i de vurur. son: dilimin söndüğü
+// yer, kalıbın sıradaki vuruşu (davulcu bir vuruşu geç çalınca kayıt akarken sonrakine ızgaradan önce varıyor, ikileniyordu);
+// son dilim, son on altılığın dörtte üçünde (kaydın sonraki ölçüsünün kick'i erken gelebilir)
+const kirik = (ad, brk, bpm, A, dilim, g = 1, kat = false) => {
+  const n = A.length;
+  const son = dilim.map((_, i) => { let j = i + 1; while (j < n && A[j] === '.') j++; return j < n ? dilim[j] : dilim[n - 1] + 11250 / bpm; });
+  return { ad, A: A.repeat(64 / n), Q: '.'.repeat(64), ses: { brk, bpm, n, dilim, son, g, kat }, kik: KIK, roll: 'S' };
+};
+export const KIRIKLAR = [
+  TURLER.amen,
+  // Amen'in başka bir çalınışı (152 BPM, ilk iki ölçü)
+  kirik('Amen 152', 'dirt/breaks152_000_amen', 151.35, 'K.KsS.hshsKKSshh' + 'K.K.SshshsK.hhSS',
+    [23, 106, 194.1, 299, 397.5, 507.4, 608.4, 724.8, 806.4, 894.7, 995.6, 1080, 1187.1, 1312.6, 1396.7, 1460.9, 1590.6,
+      1680.9, 1793, 1896.1, 1990, 2120.3, 2192.1, 2302.5, 2391.6, 2510.5, 2574.6, 2685.9, 2783.2, 2875.1, 2971.8, 3085.6], 1.1),
+  kirik('plead', 'dirt/breaks157_000_plead', 157.9, 'K.hsShh.K.S.h.hh',
+    [2.9, 84.1, 188.9, 250.5, 382.6, 463.6, 576.8, 665.7, 766.7, 860.6, 959.5, 1051.5, 1144.5, 1241, 1330.5, 1437.5]),
+  // 125'lik hip-hop break'i: kick 1'de ve 3'ün çevresinde, snare 2 ve 4'te; jungle'da hızlandırılıp çalınır
+  kirik('stomp', 'dirt/breaks125_016_bllstmp', 124.7, 'K...S.hsh.K.SKh.',
+    [36.4, 137.6, 256.3, 359, 492.1, 579, 739.7, 877.9, 988, 1133.3, 1215.8, 1351.3, 1452.3, 1604, 1687.5, 1826.2], 1.7),
+  kirik('rawcln', 'dirt/breaks165_000_rawcln', 162.4, 'KhhhShhhhhKhShhh',
+    [0, 81.7, 179, 272.2, 353.3, 426.1, 525.8, 613.9, 712.2, 808.5, 887, 983.7, 1077.5, 1201, 1264.9, 1355.5], 1.4, true),
+];
+export const kitOf = (a) => KIRIKLAR[a.brk] ?? TURLER[a.tur] ?? TURLER.amen;
+export const AMEN_H = { K: 0.5, X: 0.5, B: 0.5, Z: 0.5, S: 0.35, C: 0.35, s: 0.15, h: 0.08, r: 0.08 }; // grafikte vuruşun boyu (r: yalnız metal)
 // Doğrama: sayfa sekiz yarım ölçü (c); her biri kalıbın σ[c]'inci yarım ölçüsünü çalar. ρ[c] tekrarın boyu (otuz
 // ikilik): 16 düz, 8 yarım ölçünün son yarısı iki kez, 1 son adımı her otuz ikilikte (roll).
 // { ch, vel, met, i, T } ya da null; otuz ikiliğin başında, kaynakta yeni bir on altılık başlıyorsa
 export function breakAt(sp, x) {
   const a = sp.amen;
   if (!a) return null;
-  const T = TURLER[a.tur] ?? TURLER.amen;
+  const T = kitOf(a);
   const t = mod(Math.floor(8 * (x + 8)), 128);
   const c = t >> 4;
   const r = a.rho[c];
@@ -366,7 +392,7 @@ function clapRow(sp) {
 
 function breakRow(sp) {
   const k = `(⌊8${X}⌋ ${MOD} 16 ${MOD} ${V('ρ')})`;
-  return [`−${-BREAK_Y} + ${V('h')}(${V('A')}<sub>${V('a')}</sub>)${ex(`−30${FRAC}(8${X})`)}`, `${IF} ${k} ${MOD} 2 = 0, ${FRAC}(8${X}) &lt; ${HALF} <span class="op">(${(TURLER[sp.amen.tur] ?? TURLER.amen).ad})</span>`];
+  return [`−${-BREAK_Y} + ${V('h')}(${V('A')}<sub>${V('a')}</sub>)${ex(`−30${FRAC}(8${X})`)}`, `${IF} ${k} ${MOD} 2 = 0, ${FRAC}(8${X}) &lt; ${HALF} <span class="op">(${(TURLER[sp.amen.tur] ?? TURLER.amen).ad}${sp.amen.brk ? ` · ${KIRIKLAR[sp.amen.brk].ad}` : ''})</span>`];
 }
 
 function perkRow(sp) {
@@ -444,7 +470,7 @@ export function renderFormula(sp, en = false) {
   }
   if (sp.amen) {
     const a = sp.amen;
-    const T = TURLER[a.tur] ?? TURLER.amen;
+    const T = kitOf(a);
     defs.push(
       `${V('a')} = 8${V('σ')} + 8 − ⌈${fr(V('ρ'), 2)}⌉ + ⌊${fr(`⌊8${X}⌋ ${MOD} 16 ${MOD} ${V('ρ')}`, 2)}⌋`,
       `${V('σ')} = (${a.sig.map((d, i) => N('amen', d, `amen.s.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 2)}⌋]`,
@@ -453,7 +479,7 @@ export function renderFormula(sp, en = false) {
     );
     if (/[^.]/.test(T.Q)) defs.push(`${V('Q')} = ${T.Q.match(/.{16}/g).join(' ')}`);
     defs.push(
-      `${V('h')}: K X B Z ${AMEN_H.K}, S C ${AMEN_H.S}, s ${AMEN_H.s}${/[^.]/.test(T.Q) ? `, ${V('Q')} ${AMEN_H.r}` : ''}`,
+      `${V('h')}: K X B Z ${AMEN_H.K}, S C ${AMEN_H.S}, s ${AMEN_H.s}${/h/.test(T.A) ? `, h ${AMEN_H.h}` : ''}${/[^.]/.test(T.Q) ? `, ${V('Q')} ${AMEN_H.r}` : ''}`,
     );
   }
   if (sp.glitch) {
