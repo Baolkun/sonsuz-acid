@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, TURLER, mod } from './formula.js?v=41d748e7';
+import { MODE_NAMES, TURLER, mod } from './formula.js?v=c2f8e7f5';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
@@ -159,7 +159,7 @@ export class Besteci {
   constructor(seed) {
     this.rng = createRng(seed);
     // kullanıcının ayarları; stage, kick ve key null ise besteci kendisi seçer
-    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null, amen: null };
+    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null, amen: null, glitch: 0.4 };
     this.locked = false;
     this.newWanted = false;
     this.wantRoll = false; // elle istenen dolgu: sonraki sayfada
@@ -174,7 +174,7 @@ export class Besteci {
       kalip: 'video', M: null, n: 5, p: 2, q: 32, acc: 2, bend: 4, slide: null, base: -18, c: 2, prog: [0, 0, 0, 0],
       fill: { u: 3, v: 6 }, hocket: { u: 3, v: 1, chirp: 0.4 }, kick: { at: 4, L: 4 }, lift: 6, riser: 3, blip: 0.25,
       hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false, tema: null, geri: false,
-      amen: clone(AMEN_DUZ), son: false,
+      amen: clone(AMEN_DUZ), son: false, glitch: [],
     };
   }
 
@@ -236,6 +236,27 @@ export class Besteci {
     }
     const now = JSON.stringify(s.amen.sig);
     s.amen = clone(this.rng.pick(DOGRAMALAR.filter((d) => JSON.stringify(d.sig) !== now)));
+  }
+
+  // Glitch: cümle sonunda (sekiz ölçünün sonu) Glitch ayarıyla artan olasılıkla (yüzde 60'ta hep) son ölçünün sonuna bir kesik: tekrar
+  // (stutter), ters ya da kırık; ayar %40'ı geçince arada ikinci ölçünün sonuna da. Drop öncesinde bant durur, boşluğa
+  // iner. Her biri { x: başladığı vuruş, d: kaç vuruş, k: tür, L: tekrarın boyu, n: kırığın tutma sayısı }
+  glitchPlan(s) {
+    const { rng } = this;
+    const g = this.settings.glitch;
+    if (!g) return [];
+    if (s.gap) return rng.chance(1.6 * g) ? [{ x: 6, d: 1.5, k: 'dur' }] : [];
+    const ev = (x, d) => {
+      const k = rng.pick(['tekrar', 'tekrar', 'ters', 'kir']);
+      return { x, d, k, L: k === 'tekrar' ? rng.pick([0.5, 0.25, 0.25, 0.125]) : null, n: k === 'kir' ? rng.pick([4, 8, 16]) : null };
+    };
+    const out = [];
+    if (g > 0.4 && rng.chance(g - 0.3)) out.push(ev(-1, rng.pick([0.5, 1])));
+    if (s.son && rng.chance(1.6 * g)) {
+      const x = rng.pick([6, 6.5, 7]);
+      out.push(ev(x, 8 - x));
+    }
+    return out;
   }
 
   // yeni yolculuğun kalıbı: ağırlığına göre; bir öncekinden ve onun kardeşlerinden başka
@@ -370,6 +391,7 @@ export class Besteci {
       clap: C ? { beats: C.beats.slice(), son: C.son, from: enter('clap') } : null,
       perk: P ? { ses: P.ses, m: P.m, on: P.on.slice(), from: enter('perk') } : null,
       gap: !!s.gap,
+      glitch: st.glitch && s.glitch?.length ? clone(s.glitch) : null,
       pad: f.pad ? { lvl: f.pad } : null,
     };
     // Tür (Amen, gabber …): kick çalacak bölümlerde kick'in, clap'in, hat'in ve ek vurmalının yerine (elle seçilenler
@@ -434,6 +456,7 @@ export class Besteci {
     // drop: yükselişten sonra beşinci bölüm; yükselişin son yarım vuruşu sessiz kalır (drop öncesi boşluk)
     s.drop = settings.stage === null && !fresh && prev?.eff === 5 && eff === 4;
     s.gap = settings.stage === null && eff === 5 && after === 4;
+    s.glitch = this.glitchPlan(s);
     // yeni giren hat ya da clap sayfanın ikinci yarısında başlar
     s.enter = {
       hat: f.hat > 0 && !(prev && !fresh && prev.f.hat), clap: f.clap && !(prev && !fresh && prev.f.clap),

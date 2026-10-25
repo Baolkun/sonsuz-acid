@@ -1,6 +1,6 @@
 // Ses: formülü çalan işçiyi (AudioWorklet) kurar, sesi hafif bir sıkıştırıcıdan geçirip hoparlöre verir. Türlerin davul
 // seslerini (samples/) arkada yükleyip tek kanala indirerek işçiye verir; gelene kadar davul sentezlenir.
-import { SES_DOSYALARI } from './formula.js?v=41d748e7';
+import { SES_DOSYALARI } from './formula.js?v=c2f8e7f5';
 
 function squeeze(ctx) {
   const comp = ctx.createDynamicsCompressor();
@@ -14,7 +14,7 @@ function squeeze(ctx) {
 
 export class Ses {
   static async create(ctx) {
-    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=4958c0e7', import.meta.url));
+    await ctx.audioWorklet.addModule(new URL('./ses-isleyici.js?v=a6a94997', import.meta.url));
     return new Ses(ctx);
   }
 

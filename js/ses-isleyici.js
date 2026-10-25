@@ -9,6 +9,11 @@
 // 303'ten: vurgulu adımda (j = acc) nota daha yüksek, filtre daha açık ve keskin çalar; art arda vurgularda filtre
 // tam kapanmadan yeniden açıldığı için giderek yükselir ("accent sweep"). Dalga testereden kareye kaydırılabilir;
 // yankı tempoya oturur (noktalı sekizlik) ve yalnızca melodiye uygulanır.
+// Sub-bas: akorun kökünde bir sinüs (41 … 82 Hz), acid basın altını doldurur; her yeni notada hafifçe vurulur, kick
+// gelince pompadan daha derin kısılır, bas kick'le çakışıp çamurlaşmasın.
+// Glitch: sesin tamamı son iki saniyesiyle bir halkada tutulur; formüldeki kesik çalarken çıkış oradan okunur:
+// tekrar (son ½ … ⅛ vuruş döner, uçları yumuşatılarak), ters (geçmiş tersine), bant durur (okuma hızı sıfıra iner),
+// kırık (örnek n'de bir tutulur, 4 bite iner). Girişte ve çıkışta birkaç milisaniyelik geçiş: tık olmasın.
 // Pompalama (sidechain): kick her vurduğunda melodi bir anlığına kısılır ve ~150 ms'de geri gelir; techno'nun
 // "nefes alan" hissi. Hat ve clap pompalanmaz.
 // Pad satırı: akorun üç notası, her biri hafifçe ayrık iki testere (koro gibi), yumuşak bir filtreden geçer; filtre
@@ -30,7 +35,7 @@
 // var, aynı kanalda yeni vuruş eskisini birkaç milisaniyede keser; Amen kaydı kalıbın her vuruşunda kaydın o on
 // altılığından başlar (tempoya göre hızlanır, jungle'daki gibi perdesi de kalkar), sonraki vuruşa kadar akar.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=41d748e7';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=c2f8e7f5';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -43,8 +48,11 @@ const DECAY = 0.07; // s: …ve bu sürede kapanır
 const RES = 0.25; // 1/Q: rezonans
 const TAIL = 1; // bant geçirenden bir pay: rezonansın üstündeki tizler daha yavaş söner, sesin "dişi"
 const TOP = 4; // ×kesim: bunun üstünü ikinci bir filtre dik keser, cızırtı kalmasın
-const HP = 150; // Hz: melodinin en altı inceltilir; tok bas kick'ten gelir
+const HP = 90; // Hz: melodinin en altı inceltilir; en alttaki gövdeyi sub-bas ve kick taşır
 const MEL = 0.22;
+const SUB_DECAY = 0.15; // s: notanın başındaki vuruş…
+const SUB_HOLD = 0.5; // …ardından bu kadarı sürer
+const G_FADE = 0.004; // s: glitch'e giriş, çıkış ve tekrarın uçları
 const KICK = 0.18;
 // ayarların başlangıç değerleri: cut kesimi oktav olarak kaydırır, drive doygunluk, accent vurgu, wave kare payı,
 // echo yankı (hepsi 0 … 1)
@@ -91,7 +99,7 @@ const CLAP_OCT = 5.6; // clap: ≈ 1,5 kHz (şerit taşınırsa bu da taşınır
 const CLAP_Q = 0.8; // 1/Q
 const CLAP_GAP = 0.011; // s: ellerin çarpma arası
 const CLAP_TAIL = 0.11; // s
-const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5, room: 0.35, pad: PAD, hatLen: 1, perk: PERK };
+const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5, room: 0.35, pad: PAD, hatLen: 1, perk: PERK, sub: 0.2 };
 const DRIVE_GAIN = 2; // doygunlukta kırpma eşiği (filtre çıkışı 3,5'e kadar çıkıyor)
 const DRIVE_POW = 0.4; // sürüş arttıkça düzey bu üsle geri alınır, açınca ses patlamasın ya da kısılmasın
 const ACC_ENV = 1.2; // oktav: tam vurguda filtre zarfına eklenen
@@ -205,6 +213,21 @@ class FormulSes extends AudioWorkletProcessor {
     this.snHpA = 1 - Math.exp((-TAU * SN_HP) / sampleRate);
     this.snLpA = 1 - Math.exp((-TAU * 7000) / sampleRate);
     this.rdHpA = 1 - Math.exp((-TAU * RIDE_HP) / sampleRate);
+    // sub-bas
+    this.subPh = 0;
+    this.subF = 0;
+    this.subT = 0;
+    // glitch: çıkışın halkası, çalan kesik ve onun içindeki zaman
+    this.gBuf = new Float32Array(Math.ceil(sampleRate * 2));
+    this.gW = 0;
+    this.gEv = null;
+    this.gKey = null;
+    this.gT = 0;
+    this.gS0 = 0;
+    this.gPos = 0;
+    this.gRate = 1;
+    this.gHold = 0;
+    this.gMix = 0;
     // pad
     this.pPh = new Float64Array(6);
     this.pHz = new Float64Array(3);
@@ -305,6 +328,55 @@ class FormulSes extends AudioWorkletProcessor {
     return y * v.cut;
   }
 
+  // glitch: çıkış halkaya yazılır; kesik çalıyorsa çıkış halkadan okunur
+  glitch(v, g, bpm) {
+    const sr = sampleRate;
+    const buf = this.gBuf;
+    const N = buf.length;
+    buf[this.gW] = v;
+    const w = this.gW;
+    if (++this.gW === N) this.gW = 0;
+    const fade = 1 / (G_FADE * sr);
+    this.gMix += ((g ? 1 : 0) - this.gMix) * Math.min(1, 2 * fade);
+    if (!g && this.gMix < 0.001) {
+      this.gKey = null;
+      return v;
+    }
+    const at = (p) => {
+      p = ((p % N) + N) % N;
+      const i = Math.floor(p);
+      const j = i + 1 === N ? 0 : i + 1;
+      return buf[i] + (buf[j] - buf[i]) * (p - i);
+    };
+    const t = this.gT;
+    let y = v;
+    if (g) {
+      if (g.k === 'tekrar') {
+        // son L vuruş döner; ilk turda canlı ses, sonra halkadan; her turun uçları yumuşatılır
+        const L = Math.max(64, Math.round((g.L * 60 * sr) / bpm));
+        const u = t % L;
+        y = t < L ? v : at(this.gS0 + u);
+        const edge = Math.min(1, u * fade, (L - u) * fade);
+        if (t >= L) y *= edge;
+      } else if (g.k === 'ters') {
+        y = at(this.gS0 - t) * Math.min(1, t * fade + 0.5);
+      } else if (g.k === 'dur') {
+        // okuma hızı kesik boyunca sıfıra iner
+        const D = (g.d * 60 * sr) / bpm;
+        this.gRate = Math.max(0, 1 - t / D);
+        y = this.gRate > 0 ? at(this.gPos) * Math.min(1, 4 * this.gRate) : 0;
+        this.gPos += this.gRate;
+      } else if (g.k === 'kir') {
+        if (t % g.n === 0) this.gHold = Math.round(v * 8) / 8;
+        y = this.gHold;
+      }
+      this.gT++;
+    } else {
+      y = v;
+    }
+    return v + (y - v) * this.gMix;
+  }
+
   process(inputs, outputs) {
     const out = outputs[0][0];
     while (this.clocks.length > 1 && this.clocks[1].time <= currentTime) this.clocks.shift();
@@ -341,14 +413,28 @@ class FormulSes extends AudioWorkletProcessor {
       now.pad += (prm.pad - now.pad) * sm;
       now.hatLen += (prm.hatLen - now.hatLen) * sm;
       now.perk += (prm.perk - now.perk) * sm;
+      now.sub += (prm.sub - now.sub) * sm;
       if (!page || beat < page.beat || beat >= page.beat + PAGE) page = pageAt(pages, beat);
       let mel = 0;
       let kickOn = false;
       let gapT = 1;
       let padT = 0;
+      let gEv = null;
       if (page) {
         const { sp } = page;
         const x = beat - page.beat - 8;
+        this.subT = subHz(sp, x);
+        if (sp.glitch) {
+          for (const g of sp.glitch) if (x >= g.x && x < g.x + g.d) gEv = g;
+          if (gEv && this.gKey !== page.beat + gEv.x) {
+            this.gKey = page.beat + gEv.x;
+            this.gT = 0;
+            this.gS0 = this.gW;
+            this.gPos = this.gW;
+            this.gRate = 1;
+            this.gHold = 0;
+          }
+        }
         if (sp.pad) {
           padT = sp.pad.lvl;
           for (let k = 0; k < 3; k++) {
@@ -723,6 +809,16 @@ class FormulSes extends AudioWorkletProcessor {
         const padDuck = 1 - Math.min(1, 1.25 * now.pump) * PUMP_DEPTH * Math.exp(-kA / (1.6 * PUMP_TIME)) * (1 - Math.exp(-kA / 0.004));
         padOut = (v2 / 6) * this.pAmp * now.pad * padDuck * this.gapG;
       }
+      // sub-bas: kök değişince kısa bir kaymayla geçer
+      let subOut = 0;
+      if (this.subT && now.sub > 0.0005) {
+        this.subF = this.subF ? this.subF + (this.subT - this.subF) * this.pGlide : this.subT;
+        this.subPh += this.subF / sr;
+        if (this.subPh >= 1) this.subPh -= 1;
+        const env = SUB_HOLD + (1 - SUB_HOLD) * Math.exp(-this.age / SUB_DECAY);
+        const subDuck = 1 - Math.min(1, 0.4 + now.pump) * 0.95 * Math.exp(-kA / 0.13) * (1 - Math.exp(-kA / 0.004));
+        subOut = Math.sin(TAU * this.subPh) * env * now.sub * subDuck * this.gapG;
+      }
       const melOut = mel * MEL * comp * duck * this.gapG;
       const hatOut = hat * now.hat * this.gapG;
       const clapOut = clap * now.clap * this.gapG;
@@ -753,7 +849,8 @@ class FormulSes extends AudioWorkletProcessor {
         }
         wet *= (ROOM_OUT / 8) * now.room * (0.6 + 0.4 * duck);
       }
-      const v = (melOut + padOut + (kick + bk) * now.kick * this.gapG + hatOut + clapOut + perkOut + brkOut + wet) * this.level;
+      let v = (melOut + subOut + padOut + (kick + bk) * now.kick * this.gapG + hatOut + clapOut + perkOut + brkOut + wet) * this.level;
+      v = this.glitch(v, gEv, clock.bpm);
       // tavan: 0,8'e kadar dokunmaz, üstünü yumuşakça 1'in altında tutar; uç ayarlarda bile ses patlamaz
       const a = Math.abs(v);
       out[i] = a <= 0.8 ? v : Math.sign(v) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2));

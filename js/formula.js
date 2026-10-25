@@ -245,6 +245,13 @@ const nearHz = (sp, semis, target) => {
   }
   return best;
 };
+// sub-bas: o ölçünün akor kökü, 41 … 82 Hz arasındaki oktavda (E1 … E2); acid basın altını doldurur
+export function subHz(sp, x) {
+  let f = REF_HZ * 2 ** ((scaleSemi(sp.c, rootAt(sp, x)) + sp.base) / 12);
+  while (f > 82.5) f /= 2;
+  while (f < 41.2) f *= 2;
+  return f;
+}
 export function drumHz(sp, x, kind, k = 0) {
   const r = rootAt(sp, x);
   if (kind === 'tom') {
@@ -387,6 +394,11 @@ function extras(sp) {
   return s;
 }
 
+// glitch: tekrar son ½, ¼ ya da ⅛ vuruşu döndürür (stutter), ters geçmişi tersine çalar, dur bandı yavaşlatıp durdurur
+// (tape stop), kir örnekleri n'de bir tutar ve kabalaştırır (bitcrush)
+const GLITCH_TR = { tekrar: 'tekrar', ters: 'ters', dur: 'bant durur', kir: 'kırık' };
+const GLITCH_EN = { tekrar: 'stutter', ters: 'reverse', dur: 'tape stop', kir: 'crush' };
+
 // en: İngilizce (video kaydı için)
 export function renderFormula(sp, en = false) {
   let mel = sp.tune ? fr(`${V('S')}(${sp.riser ? `${V('R')} + ` : ''}${V('T')}) + 12 − ${N('base', -sp.base, 'base')}`, 12) : bassFrac(sp);
@@ -420,6 +432,12 @@ export function renderFormula(sp, en = false) {
     defs.push(
       `${V('h')}: K X B Z ${AMEN_H.K}, S C ${AMEN_H.S}, s ${AMEN_H.s}${/[^.]/.test(T.Q) ? `, ${V('Q')} ${AMEN_H.r}` : ''}`,
     );
+  }
+  if (sp.glitch) {
+    const ad = en ? GLITCH_EN : GLITCH_TR;
+    const span = (g) => `${X} ∈ [${g.x}, ${g.x + g.d})`;
+    const how = (g) => (g.k === 'tekrar' ? ` ${fr('1', 1 / g.L)}` : g.k === 'kir' ? ` ÷${g.n}` : '');
+    defs.push(`${V('G')}: ${sp.glitch.map((g) => `${span(g)} ${ad[g.k]}${how(g)}`).join(', ')}`);
   }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);
   defs.push(`${V('r')} = (${sp.prog.map((d, i) => N('prog', d, `prog.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 4)}⌋]`);
