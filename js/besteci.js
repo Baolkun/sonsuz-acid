@@ -74,6 +74,8 @@ function features(stage, density) {
   const f = {
     kick: 'four', chord: stage > 0, fill: false, hocket: false, blip: false, oct: false, riser: false, lift: false,
     hat: [0, 1, 1, 2, 2, 2, 1][stage], clap: stage >= 2 && stage !== 6,
+    // arkada akorlar üçüncü bölümde girer; kırılmada öne çıkar
+    pad: [0, 0, 1, 1, 1, 1, 1.8][stage],
   };
   if (stage === 0) {
     f.kick = 'bar';
@@ -288,6 +290,7 @@ export class Besteci {
       hat: H ? { on: H.on.slice(), open: H.open.slice(), from: enter('hat'), roll: !!s.roll } : null,
       clap: C ? { beats: C.beats.slice(), son: C.son, from: enter('clap') } : null,
       gap: !!s.gap,
+      pad: f.pad ? { lvl: f.pad } : null,
     };
   }
 
@@ -336,6 +339,7 @@ export class Besteci {
       for (const key of ['fill', 'hocket', 'blip', 'oct', 'riser', 'lift']) if (f[key] && !prev.f[key]) changed.add(key);
       if (f.hat !== prev.f.hat) changed.add('hat');
       if (f.clap !== prev.f.clap) changed.add('clap');
+      if (f.pad && !prev.f.pad) changed.add('pad');
       if (f.chord && !prev.f.chord) changed.add('acc');
     }
     // filtre yolculuk boyunca açılır, yeni yolculukta yeniden kapanır

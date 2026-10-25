@@ -11,13 +11,15 @@
 // yankı tempoya oturur (noktalı sekizlik) ve yalnızca melodiye uygulanır.
 // Pompalama (sidechain): kick her vurduğunda melodi bir anlığına kısılır ve ~150 ms'de geri gelir; techno'nun
 // "nefes alan" hissi. Hat ve clap pompalanmaz.
+// Pad satırı: akorun üç notası, her biri hafifçe ayrık iki testere (koro gibi), yumuşak bir filtreden geçer; filtre
+// yavaşça nefes alır. Yavaş açılır, pompaya en çok o uyar, odaya çok gider.
 // Oda yankısı (reverb): sekiz gecikme hattı birbirine karışarak geri beslenir (FDN). Clap'e çok, hat'e biraz, melodiye
 // az gider; yankının altı kesilir, bas çamurlaşmasın; her dönüşte tizi koyulaşır.
 // Hat satırı: 808'deki gibi altı kare dalga (uyumsuz frekanslarda, metalik) ve biraz gürültü, tizi süzülerek. Satır
 // tanımlı olmaya başlayınca vurulur (swing de satırda), şiddeti satırdaki v; açık hat uzun söner, sonraki hat onu keser.
 // Clap satırı: gürültü, ortada süzülür; başı birkaç milisaniye arayla üç kez çarpar (eller), ardından kısa bir kuyruk.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -41,22 +43,30 @@ const CLICK = 0.35; // başındaki tık…
 const CLICK_TIME = 0.0015; // …bu sürede söner
 const PUMP_DEPTH = 0.7; // tam pompada melodi bu kadar kısılır…
 const PUMP_TIME = 0.1; // s: …ve bu süreyle geri gelir
+const PAD = 0.2;
+const PAD_DETUNE = 0.005; // oktav: iki testere arası (~6 sent)
+const PAD_LP = 1300; // Hz
+const PAD_LFO = 0.07; // Hz: filtrenin nefesi
+const PAD_IN = 0.4; // s: açılış…
+const PAD_OUT = 0.8; // s: …kapanış
 const ROOM_MS = [29.7, 37.1, 41.1, 43.7, 53.3, 59.9, 67.3, 73.1]; // gecikme hatları
-const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7 };
+const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6 };
 const ROOM_HP = 250; // Hz: yankıya giden sesin altı kesilir
 const ROOM_DAMP = 5000; // Hz: hatların içinde tizi koyulaştırır
 const ROOM_OUT = 0.6;
 const HAT = 0.18;
 const CLAP = 0.24;
-const HAT_DECAY = [0.022, 0.13]; // s: kapalı, açık
+const HAT_DECAY = [0.022, 0.09]; // s: kapalı, açık
 const METAL = [205.3, 304.4, 369.6, 522.7, 540, 800]; // Hz: 808 hat'inin altı osilatörü
-const METAL_MIX = 0.75; // metal / gürültü
-const HAT_OCT = 3.3; // hat satırının y'sinden kesim: REF_HZ · 2^(y + bu) ≈ 8 kHz
+const METAL_MIX = 0.6; // metal / gürültü
+const HAT_BP = 9000; // Hz: metalin bandı (808'deki gibi kareler önce burada süzülür)
+const HAT_TOP = 13000; // Hz: tavan; üstü cızırtı
+const HAT_OCT = 2.9; // hat satırının y'sinden kesim: REF_HZ · 2^(y + bu) ≈ 6,5 kHz
 const CLAP_OCT = 5.2; // clap: ≈ 1,5 kHz
 const CLAP_Q = 0.8; // 1/Q
 const CLAP_GAP = 0.011; // s: ellerin çarpma arası
 const CLAP_TAIL = 0.11; // s
-const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5, room: 0.35 };
+const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5, room: 0.35, pad: PAD };
 const DRIVE_GAIN = 2; // doygunlukta kırpma eşiği (filtre çıkışı 3,5'e kadar çıkıyor)
 const DRIVE_POW = 0.4; // sürüş arttıkça düzey bu üsle geri alınır, açınca ses patlamasın ya da kısılmasın
 const ACC_ENV = 1.2; // oktav: tam vurguda filtre zarfına eklenen
@@ -123,12 +133,25 @@ class FormulSes extends AudioWorkletProcessor {
     this.hG = 0; // hat filtresi
     this.hs1 = 0;
     this.hs2 = 0;
+    this.hs3 = 0; // ikinci yüksek geçiren
+    this.hs4 = 0;
+    this.hb1 = 0; // metalin bant geçireni
+    this.hb2 = 0;
+    this.ht = 0; // tavan
+    this.ht2 = 0;
     this.cAge = 1; // s: son clap'ten beri
     this.cG = 0;
     this.cs1 = 0;
     this.cs2 = 0;
     this.seed = 22222; // gürültü
     this.gapG = 1; // drop öncesi boşlukta 0
+    // pad
+    this.pPh = new Float64Array(6);
+    this.pHz = new Float64Array(3);
+    this.pAmp = 0;
+    this.p1 = 0;
+    this.p2 = 0;
+    this.pLfo = 0;
     // oda
     this.rLines = ROOM_MS.map((ms) => new Float32Array(Math.round((ms * sampleRate) / 1000)));
     this.rPos = new Int32Array(ROOM_MS.length);
@@ -147,6 +170,11 @@ class FormulSes extends AudioWorkletProcessor {
     this.kDown = per(0.006);
     this.sweepFall = per(SWEEP_FALL);
     this.sweepRise = per(0.02);
+    this.hBp = Math.tan((Math.PI * Math.min(HAT_BP, 0.45 * sampleRate)) / sampleRate);
+    this.hTop = 1 - Math.exp((-TAU * HAT_TOP) / sampleRate);
+    this.pIn = per(PAD_IN);
+    this.pOut = per(PAD_OUT);
+    this.pGlide = per(0.015);
     const g = Math.tan((Math.PI * HP) / sampleRate);
     const k = Math.SQRT2;
     const a1 = 1 / (1 + g * (g + k));
@@ -205,13 +233,22 @@ class FormulSes extends AudioWorkletProcessor {
       now.clap += (prm.clap - now.clap) * sm;
       now.pump += (prm.pump - now.pump) * sm;
       now.room += (prm.room - now.room) * sm;
+      now.pad += (prm.pad - now.pad) * sm;
       if (!page || beat < page.beat || beat >= page.beat + PAGE) page = pageAt(pages, beat);
       let mel = 0;
       let kickOn = false;
       let gapT = 1;
+      let padT = 0;
       if (page) {
         const { sp } = page;
         const x = beat - page.beat - 8;
+        if (sp.pad) {
+          padT = sp.pad.lvl;
+          for (let k = 0; k < 3; k++) {
+            const hz = REF_HZ * 2 ** padY(sp, x, k);
+            this.pHz[k] = this.pHz[k] ? this.pHz[k] + (hz - this.pHz[k]) * this.pGlide : hz;
+          }
+        }
         if (sp.gap && x >= 7.5) gapT = 0; // drop öncesi boşluk: son yarım vuruş sessiz, yalnızca oda yankısı kalır
 
         // melodi: perde sıçrayınca yeni nota; vurgulu adıma girince perde aynı kalsa da nota yeniden vurulur (303'teki gibi)
@@ -339,24 +376,47 @@ class FormulSes extends AudioWorkletProcessor {
         kick += CLICK * (noise - this.kc1) * Math.exp(-this.kAge / CLICK_TIME) * this.kAmp;
       }
       let hat = 0;
-      let metal = 0;
-      for (let k = 0; k < METAL.length; k++) {
-        this.mPh[k] += METAL[k] / sr;
-        if (this.mPh[k] >= 1) this.mPh[k] -= 1;
-        metal += this.mPh[k] < 0.5 ? 1 : -1;
-      }
       if (this.hAge < 8 * this.hDecay) {
-        const src = METAL_MIX * metal / 3 + (1 - METAL_MIX) * noise;
-        // iki kutuplu yüksek geçiren (Simper)
-        const g = this.hG;
-        const a1 = 1 / (1 + g * (g + 1.2));
-        const a2 = g * a1;
-        const v3 = src - this.hs2;
-        const v1 = a1 * this.hs1 + a2 * v3;
-        const v2 = this.hs2 + a2 * this.hs1 + g * a2 * v3;
+        // altı kare (bant sınırlı, cızırtısız) ve gürültü birlikte bir bantta süzülür: metalin çınlaması
+        let metal = 0;
+        for (let k = 0; k < METAL.length; k++) {
+          const dt = METAL[k] / sr;
+          let ph = this.mPh[k] + dt;
+          if (ph >= 1) ph -= 1;
+          this.mPh[k] = ph;
+          let ph2 = ph + 0.5;
+          if (ph2 >= 1) ph2 -= 1;
+          metal += (ph < 0.5 ? 1 : -1) + blep(ph, dt) - blep(ph2, dt);
+        }
+        let g = this.hBp;
+        let a1 = 1 / (1 + g * (g + 1.4));
+        let a2 = g * a1;
+        let v3 = METAL_MIX * metal / 3 + (1 - METAL_MIX) * noise - this.hb2;
+        let v1 = a1 * this.hb1 + a2 * v3;
+        let v2 = this.hb2 + a2 * this.hb1 + g * a2 * v3;
+        this.hb1 = 2 * v1 - this.hb1;
+        this.hb2 = 2 * v2 - this.hb2;
+        let x = 2 * v1 + 0.15 * noise; // biraz da ham gürültü: hava
+        // dört kutuplu yüksek geçiren (iki Simper art arda): altı tamamen temiz
+        g = this.hG;
+        a1 = 1 / (1 + g * (g + 1.4));
+        a2 = g * a1;
+        v3 = x - this.hs2;
+        v1 = a1 * this.hs1 + a2 * v3;
+        v2 = this.hs2 + a2 * this.hs1 + g * a2 * v3;
         this.hs1 = 2 * v1 - this.hs1;
         this.hs2 = 2 * v2 - this.hs2;
-        hat = 2.8 * this.hVel * (src - 1.2 * v1 - v2) * Math.exp(-this.hAge / this.hDecay) * (1 - Math.exp(-this.hAge / 0.0005));
+        x = x - 1.4 * v1 - v2;
+        v3 = x - this.hs4;
+        v1 = a1 * this.hs3 + a2 * v3;
+        v2 = this.hs4 + a2 * this.hs3 + g * a2 * v3;
+        this.hs3 = 2 * v1 - this.hs3;
+        this.hs4 = 2 * v2 - this.hs4;
+        x = x - 1.4 * v1 - v2;
+        // tavan: iki tek kutuplu alçak geçiren
+        this.ht += (x - this.ht) * this.hTop;
+        this.ht2 += (this.ht - this.ht2) * this.hTop;
+        hat = 2.8 * this.hVel * this.ht2 * Math.exp(-this.hAge / this.hDecay) * (1 - Math.exp(-this.hAge / 0.0005));
       }
       this.hAge += 1 / sr;
       let clap = 0;
@@ -379,13 +439,38 @@ class FormulSes extends AudioWorkletProcessor {
       // pompa: kick'in vurduğu an kısılır (başı 4 ms'de iner, tık olmasın), sonra geri gelir; kick yoksa düz
       const duck = 1 - now.pump * PUMP_DEPTH * Math.exp(-this.kAge / PUMP_TIME) * (1 - Math.exp(-this.kAge / 0.004));
       this.gapG += (gapT - this.gapG) * this.fade;
+      // pad: altı testere, yumuşak filtre; pompa ona daha derin
+      this.pAmp += (padT - this.pAmp) * (padT > this.pAmp ? this.pIn : this.pOut);
+      let padOut = 0;
+      if (this.pAmp > 0.0005) {
+        let osc = 0;
+        for (let k = 0; k < 6; k++) {
+          const dt = (this.pHz[k >> 1] * 2 ** (k & 1 ? PAD_DETUNE : -PAD_DETUNE)) / sr;
+          let ph = this.pPh[k] + dt;
+          if (ph >= 1) ph -= 1;
+          this.pPh[k] = ph;
+          osc += 2 * ph - 1 - blep(ph, dt);
+        }
+        this.pLfo += PAD_LFO / sr;
+        if (this.pLfo >= 1) this.pLfo -= 1;
+        const g = Math.tan((Math.PI * PAD_LP * 2 ** (0.5 * Math.sin(TAU * this.pLfo))) / sr);
+        const a1 = 1 / (1 + g * (g + 1.1));
+        const a2 = g * a1;
+        const v3 = osc - this.p2;
+        const v1 = a1 * this.p1 + a2 * v3;
+        const v2 = this.p2 + a2 * this.p1 + g * a2 * v3;
+        this.p1 = 2 * v1 - this.p1;
+        this.p2 = 2 * v2 - this.p2;
+        const padDuck = 1 - Math.min(1, 1.25 * now.pump) * PUMP_DEPTH * Math.exp(-this.kAge / (1.6 * PUMP_TIME)) * (1 - Math.exp(-this.kAge / 0.004));
+        padOut = (v2 / 6) * this.pAmp * now.pad * padDuck * this.gapG;
+      }
       const melOut = mel * MEL * comp * duck * this.gapG;
       const hatOut = hat * now.hat * this.gapG;
       const clapOut = clap * now.clap * this.gapG;
       // oda: sönme süresi (RT60) 0,8 … 2,2 s, Oda ayarıyla uzar
       let wet = 0;
       if (now.room > 0.001) {
-        let send = ROOM_SEND.mel * melOut + ROOM_SEND.hat * hatOut + ROOM_SEND.clap * clapOut;
+        let send = ROOM_SEND.mel * melOut + ROOM_SEND.hat * hatOut + ROOM_SEND.clap * clapOut + ROOM_SEND.pad * padOut;
         this.rHp += (send - this.rHp) * this.rHpA;
         send -= this.rHp;
         const rt = 0.8 + 1.4 * now.room;
@@ -407,7 +492,7 @@ class FormulSes extends AudioWorkletProcessor {
         }
         wet *= (ROOM_OUT / 8) * now.room * (0.6 + 0.4 * duck);
       }
-      const v = (melOut + kick * now.kick * this.gapG + hatOut + clapOut + wet) * this.level;
+      const v = (melOut + padOut + kick * now.kick * this.gapG + hatOut + clapOut + wet) * this.level;
       // tavan: 0,8'e kadar dokunmaz, üstünü yumuşakça 1'in altında tutar; uç ayarlarda bile ses patlamaz
       const a = Math.abs(v);
       out[i] = a <= 0.8 ? v : Math.sign(v) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2));

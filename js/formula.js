@@ -124,6 +124,11 @@ export function clapAt(sp, x) {
   return (mod(s, 4) === 0 && c.beats.includes(mod(s / 4, 4))) || (c.son && mod(s, 32) === 31);
 }
 
+// pad: akorun üç notası (dizide kök, üçlü, beşli; i = 0, 1, 2), basın iki oktav üstünde, ölçü boyunca tutulur
+export function padY(sp, x, i) {
+  return sp.pad ? (scaleSemi(sp.c, rootAt(sp, x) + 2 * i) + 24 + sp.base) / 12 : null;
+}
+
 // hat ve clap satırları: adımın ilk yarısında tanımlı; y sesin parlaklığı (gürültünün süzüldüğü yer), başta parlak
 export const HAT_Y = 2.1;
 export const CLAP_Y = -2.3;
@@ -233,7 +238,8 @@ export function renderFormula(sp) {
   let mel = bassFrac(sp);
   if (sp.hocket) mel = brace([[hocketPart(sp), `${IF} ${V('j')} ${MOD} 3 &gt; 0`], [mel]]);
   mel += extras(sp);
-  const rows = [sp.kick && kickRow(sp), sp.hat && hatRow(sp), sp.clap && clapRow(sp)].filter(Boolean);
+  const pad = sp.pad && [fr(`${V('S')}(${V('r')} + 2${V('i')}) + ${N('pad', 24)} − ${N('base', -sp.base, 'base')}`, 12), `${V('i')} ${IN} {0, 1, 2}`];
+  const rows = [sp.kick && kickRow(sp), sp.hat && hatRow(sp), sp.clap && clapRow(sp), pad].filter(Boolean);
   const main = rows.length ? brace([...rows, [mel]]) : mel;
   const defs = sp.M
     ? [`${V('b')} = ⌊4${X}⌋ ${MOD} ${N('M', sp.M, 'M')}`, `${V('j')} = (${V('b')} + ${N('p', sp.p, 'p')}) ${MOD} ${N('n', sp.n, 'n')}`]
