@@ -177,6 +177,28 @@ export function breakY(sp, x) {
   return b ? BREAK_Y + (AMEN_H[b.ch] ?? AMEN_H.r) * Math.exp(-30 * u) : null;
 }
 
+// Perdeli davullar tona oturur (sabit perdede her tonda falso duyuluyordu): o ölçünün akorundan, istenen perdeye en
+// yakın oktavda. Tom akorun beşlisinden üçlüsüne, köke iner (k: kaçıncı vuruş); rim akorun hedefine en yakın notası,
+// snare gövdesi tonun kökü ya da beşlisi (akorla oynamaz)
+const nearHz = (sp, semis, target) => {
+  let best = 0;
+  for (const s of semis) {
+    const f = REF_HZ * 2 ** ((s + sp.base) / 12);
+    const g = f * 2 ** Math.round(Math.log2(target / f));
+    if (!best || Math.abs(Math.log2(g / target)) < Math.abs(Math.log2(best / target))) best = g;
+  }
+  return best;
+};
+export function drumHz(sp, x, kind, k = 0) {
+  const r = rootAt(sp, x);
+  if (kind === 'tom') {
+    const root = nearHz(sp, [scaleSemi(sp.c, r)], 120);
+    return root * 2 ** ((scaleSemi(sp.c, r + [4, 2, 0][Math.min(k, 2)]) - scaleSemi(sp.c, r)) / 12);
+  }
+  if (kind === 'rim') return nearHz(sp, [0, 2, 4].map((d) => scaleSemi(sp.c, r + d)), 455);
+  return nearHz(sp, [0, scaleSemi(sp.c, 4)], 190); // snare
+}
+
 // pad: akorun üç notası (dizide kök, üçlü, beşli; i = 0, 1, 2), basın iki oktav üstünde, ölçü boyunca tutulur
 export function padY(sp, x, i) {
   return sp.pad ? (scaleSemi(sp.c, rootAt(sp, x) + 2 * i) + 24 + sp.base) / 12 : null;

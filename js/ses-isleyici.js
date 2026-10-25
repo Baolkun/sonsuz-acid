@@ -20,12 +20,13 @@
 // Clap satırı: gürültü, ortada süzülür; başı birkaç milisaniye arayla üç kez çarpar (eller), ardından kısa bir kuyruk.
 
 // Ek vurmalı satırı: shaker (gürültü, tizde bir bantta, kısa), rim (808'deki gibi iki kısa çınlayan sinüs, biraz
-// kırpılmış: tahta "tok"), tom (perdesi hızla inen sinüs; iki ölçünün sonunda her vuruşta biraz daha pes).
+// kırpılmış: tahta "tok"), tom (perdesi hızla inen sinüs; iki ölçünün sonunda akorun beşlisinden köküne iner).
+// Tom, rim ve snare'in perdesi tona oturur (drumHz).
 // Amen satırı (break): kendi davul takımı, otuz ikiliğe girerken satır tanımlıysa vurulur. Kick perdesi hızla inen
 // sinüs (pompayı o da tetikler), snare iki kısa sinüs ve süzülmüş gürültü (hayalet snare kısık ve kısa), ride hat'in
 // metali alçak bir bantta uzun söner, crash tizde uzun gürültü. Düzeyleri Kick, Clap ve Hat ayarlarından gelir.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -59,12 +60,11 @@ const ROOM_MS = [29.7, 37.1, 41.1, 43.7, 53.3, 59.9, 67.3, 73.1]; // gecikme hat
 const PERK = 0.2;
 const SHAKER_BP = 7000; // Hz
 const SHAKER_DECAY = 0.03; // s
-const RIM_HZ = [455, 1667]; // 808'in rim'i
+const RIM_RATIO = 3.66; // 808'in rim'i: 455 ve 1667 Hz; ilki tona oturur, ikincisi aynı oranda
 const RIM_DECAY = [0.012, 0.007]; // s
-const TOM_HZ = 190; // ilk vuruşun perdesi; sonrakiler çeyrek oktav iner
 const TOM_DECAY = 0.22; // s
 const BK_DECAY = 0.16; // s: Amen'in kick'i
-const SN_HZ = [185, 330]; // snare'in gövdesi
+const SN_RATIO = 1.78; // snare'in gövdesi: tona oturan sinüs ve onun bu katı
 const SN_DECAY = [0.05, 0.13]; // s: gövde, gürültü (hayalet snare'de yarısı)
 const SN_HP = 900; // Hz: snare gürültüsünün altı
 const RIDE_DECAY = 0.45; // s
@@ -170,7 +170,8 @@ class FormulSes extends AudioWorkletProcessor {
     this.qAge = 1;
     this.qSes = null;
     this.qVel = 1;
-    this.qHz = TOM_HZ;
+    this.qHz = 150;
+    this.snHz = 190;
     this.qPh = new Float64Array(2);
     this.qs1 = 0;
     this.qs2 = 0;
@@ -378,7 +379,7 @@ class FormulSes extends AudioWorkletProcessor {
           this.qAge = 0;
           this.qSes = q.ses;
           this.qVel = q.vel;
-          this.qHz = TOM_HZ * 2 ** (-0.25 * q.k);
+          this.qHz = drumHz(sp, x, q.ses, q.k);
           this.qPh.fill(0);
         }
         this.qOn = yq !== null;
@@ -403,6 +404,7 @@ class FormulSes extends AudioWorkletProcessor {
             if (h.ch === 'S' || h.ch === 's') {
               this.snAge = 0;
               this.snVel = h.vel;
+              this.snHz = drumHz(sp, x, 'snare');
               this.snPh.fill(0);
             }
             if (h.ch === 'X') this.crAge = 0;
@@ -538,7 +540,7 @@ class FormulSes extends AudioWorkletProcessor {
         } else if (this.qSes === 'rim') {
           let s = 0;
           for (let k = 0; k < 2; k++) {
-            this.qPh[k] += RIM_HZ[k] / sr;
+            this.qPh[k] += (this.qHz * (k ? RIM_RATIO : 1)) / sr;
             s += Math.sin(TAU * this.qPh[k]) * Math.exp(-a / RIM_DECAY[k]);
           }
           perk = 1.6 * Math.tanh(2.5 * s) * att;
@@ -564,7 +566,7 @@ class FormulSes extends AudioWorkletProcessor {
         const ghost = this.snVel < 0.5 ? 0.5 : 1;
         let body = 0;
         for (let k = 0; k < 2; k++) {
-          this.snPh[k] += SN_HZ[k] / sr;
+          this.snPh[k] += (this.snHz * (k ? SN_RATIO : 1)) / sr;
           body += Math.sin(TAU * this.snPh[k]);
         }
         this.snHp += (noise - this.snHp) * this.snHpA;

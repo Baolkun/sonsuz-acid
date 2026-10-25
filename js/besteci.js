@@ -372,7 +372,8 @@ export class Besteci {
       gap: !!s.gap,
       pad: f.pad ? { lvl: f.pad } : null,
     };
-    // Amen: kick çalacak bölümlerde kick'in, clap'in ve hat'in yerine (elle seçilenler kalır). Drop'ta düz Amen döner;
+    // Amen: kick çalacak bölümlerde kick'in, clap'in, hat'in ve ek vurmalının yerine (elle seçilenler kalır; rim ve tom
+    // Amen'in senkopunun üstüne binince karışıyordu). Drop'ta düz Amen döner;
     // cümle sonunda son yarım ölçü dolgu (breakcore'da snare roll), yükselişin son ölçüsünde roll hızlanarak gelir
     if (st.amen && kick) {
       const core = st.amen === 'core';
@@ -382,7 +383,7 @@ export class Besteci {
         a.rho[7] = core ? 1 : 8;
         if (core) a.rho[6] = 8;
       }
-      Object.assign(sp, { amen: a, kick: null, clap: st.clap ? sp.clap : null, hat: st.hat ? sp.hat : null });
+      Object.assign(sp, { amen: a, kick: null, clap: st.clap ? sp.clap : null, hat: st.hat ? sp.hat : null, perk: st.perk ? sp.perk : null });
     }
     // şarkı: melodi notaları listeden okur; bas satırının kalıbı, dolgusu, hoketi, kayması susar, akorlar şarkınınki
     const song = SARKILAR[st.sarki];
