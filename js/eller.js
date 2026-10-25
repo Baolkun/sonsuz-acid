@@ -6,7 +6,7 @@
 //   son ölçü: üç ölçü yerinde durur, dördüncü ölçüde itilir
 //   yükseliş: filtre, rezonans ve doygunluk sayfa sonuna doğru hızlanarak tırmanır
 //   düşüş: yeni yolculuğun ilk vuruşunda filtre kapanır (yükselişten iniş), sonra yeniden açılmaya başlar
-//   drop: yükselişten sonra her şey geri gelince de düşüş
+//   drop: yükselişten sonra her şey geri gelince filtre kapanmaz, yükselişin tepesinden başlar, iki ölçüde bölümün yerine iner
 //   kırılma: kick susunca filtre kapanır, rezonans keskinleşir, kuyruk uzar, yankı açılır
 // Bölümün ilk sayfasında bir hareket, tekrarında öteki gelir. İtişten (son ölçü, yükseliş) sonra yeni sayfanın ilk
 // vuruşunda geri inilir. Yankı cümle sonunda (son iki vuruş) fırlatılır, yeni ölçüde söner. Rastgele olan yalnızca
@@ -128,14 +128,15 @@ export class Eller {
     const e = this.energy(info);
     const quiet = !sp.kick; // kick susuyor: kırılma
     const list = GESTURES[stage];
-    // drop'ta da düşüş: filtre ilk vuruşta kapanır, sonra açılır
-    const kind = quiet ? 'kirilma' : (fresh && this.last) || drop ? 'dusus' : sp.riser ? 'yukselis' : list[variant % list.length];
+    // yeni yolculukta düşüş: filtre ilk vuruşta kapanır, sonra açılır. Drop'ta kapanmaz: yükselişin tepesinde açık gelir
+    const kind = quiet ? 'kirilma' : drop ? 'drop' : fresh && this.last ? 'dusus' : sp.riser ? 'yukselis' : list[variant % list.length];
     const back = PUSH.has(this.last); // itişten sonra ilk vuruşta geri inilir
     const A = 10 + 12 * e; // filtrenin hareket genişliği
     const lvl = -25 + 40 * e + jit(4); // bölümün filtre seviyesi
     const top = lvl + A / 2;
     const low = lvl - A / 2;
     // tırmanış ve basamak bulunduğu yerden başlar; tırmanacak yer yoksa (ya da itişten sonra) önce aşağı iner
+    const peak = 30 + 10 * e; // yükselişin vardığı yer
     const start = (from) => (back || from > top - 5 ? low : from);
     const wah = kind === 'nefes4' ? (u) => breath(u, 4) : kind === 'nefes8' ? (u) => breath(u, 8) : () => 0;
     const T = back ? 1 : 4;
@@ -145,12 +146,13 @@ export class Eller {
       nefes4: { T, at: (u) => lvl - A / 3 + A * wah(u) },
       nefes8: { T, at: (u) => lvl - A / 3 + A * wah(u) },
       son: { T, at: (u) => lvl + A * ease((u - 12) / 4) },
-      yukselis: { T: 1, at: (u) => low + (30 + 10 * e - low) * rise(u) },
+      yukselis: { T: 1, at: (u) => low + (peak - low) * rise(u) },
       dusus: { T: 0.5, at: (u) => -40 + (top + 40) * ease(u / 16) },
+      drop: { T: 0.5, at: (u) => peak + (top - peak) * ease(u / 8) },
       kirilma: { T: 4, at: () => -45 },
     }[kind];
     const climb = kind === 'yukselis';
-    const reset = kind === 'dusus' ? 0.5 : null; // düşüşte hepsi ilk vuruşta yerine iner
+    const reset = kind === 'dusus' || kind === 'drop' ? 0.5 : null; // düşüşte ve drop'ta hepsi ilk vuruşta yerine iner
     const rez = -8 + 18 * e + (quiet ? 12 : 0) + jit(3);
     const zarf = -12 + 20 * e - 0.25 * lvl + jit(4); // filtre kapalıyken zarf daha çok açar: "vıyk"
     const kuyruk = DECAY_BY_STAGE[stage] + (quiet ? 20 : 0) + jit(4);

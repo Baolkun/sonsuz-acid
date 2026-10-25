@@ -297,6 +297,8 @@ export class Besteci {
     if (type === 'none') kick = null;
     if (type === 'halfFour') kick.at = s.kick.at;
     if (type === 'roll') kick.L = s.kick.L;
+    // drop öncesi: yükselişin son ölçüsünde kick susar, drop'ta bütün gücüyle geri gelir
+    if (kick && s.gap) kick.to = 4;
     // oktav sıçraması yüksek bir akor kökünün üstüne binerse melodi iki buçuk oktava fırlar; o ölçülerde yok
     const oct = f.oct && Math.max(...s.prog) <= 2;
     // kayma yalnızca bas satırında; hoket ya da oktav sıçraması varken önceki nota başka yerde, kayma yok

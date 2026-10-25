@@ -24,7 +24,7 @@ export const scaleSemi = (c, m) => Math.floor((12 * m + c) / 7);
 
 // kick o an çalıyorsa evresi (u), çalmıyorsa null
 function kickPhase(kick, x) {
-  if (!kick || x < (kick.from ?? -Infinity)) return null;
+  if (!kick || x < (kick.from ?? -Infinity) || x >= (kick.to ?? Infinity)) return null;
   let u;
   let gate = 0.5;
   switch (kick.type) {
@@ -190,7 +190,7 @@ function kickRow(sp) {
     case 'halfFour': { const R = `(2 − (${X} ≥ ${n(kick.at, 'kick.at')}))`; u = `${R}${FRAC}(${fr(X, R)})`; break; }
     case 'roll': u = `${FRAC}((1 + 3(${X} ${MOD} ${n(kick.L, 'kick.L')} ≥ ${fr(n(2 * kick.L - 1), 2)}))${X})`; break;
   }
-  const from = kick.from !== undefined ? `${X} ≥ ${n(kick.from)}, ` : '';
+  const from = (kick.from !== undefined ? `${X} ≥ ${n(kick.from)}, ` : '') + (kick.to !== undefined ? `${X} &lt; ${n(kick.to)}, ` : '');
   const t = sp.base + 12;
   const tail = t === -6 ? ` − ${HALF}` : t === 0 ? '' : ` − ${fr(N('base', -t), 12)}`;
   return [`2.1${ex(`−18${kick.type === 'bar' ? '·' : ''}${u}`)}${tail}`, `${IF} ${from}${u} &lt; ${gate}`];
