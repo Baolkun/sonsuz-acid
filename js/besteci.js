@@ -8,8 +8,8 @@
 // Her sayfa yazıldığı andaki durumu saklar: bir ayar ya da formüldeki bir sayı değişince çalan sayfa o durumdan
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
-import { createRng } from './rng.js';
-import { MODE_NAMES, mod } from './formula.js';
+import { createRng } from './rng.js?v=baee4ba4';
+import { MODE_NAMES, mod } from './formula.js?v=f73a0aec';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey

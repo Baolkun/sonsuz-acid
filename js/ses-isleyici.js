@@ -26,7 +26,7 @@
 // sinüs (pompayı o da tetikler), snare iki kısa sinüs ve süzülmüş gürültü (hayalet snare kısık ve kısa), ride hat'in
 // metali alçak bir bantta uzun söner, crash tizde uzun gürültü. Düzeyleri Kick, Clap ve Hat ayarlarından gelir.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, REF_HZ, KICK_HZ } from './formula.js';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, HAT_Y, REF_HZ, KICK_HZ } from './formula.js?v=f73a0aec';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
