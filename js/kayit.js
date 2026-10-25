@@ -3,7 +3,8 @@
 // Formül resim olarak değil, görünmez bir kutuda sayfadaki gibi dizdirilip harflerin yerleri okunarak çizilir.
 
 import { View } from './view.js';
-import { renderFormula, MODE_NAMES } from './formula.js';
+import { renderFormula } from './formula.js';
+import { pageName, infoLine } from './dil.js';
 
 const W = 540; // mantıksal boyut; piksel çarpanı S ile 1080×1920
 const H = 960;
@@ -17,13 +18,6 @@ const MATH = '"STIX Two Math", "STIX Two Text", "Latin Modern Math", "Times New 
 const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
 const BRACE = 'M9 1C4 1 5.5 10 5.5 24S5 47 1 50C5 53 5.5 62 5.5 76S4 99 9 99'; // formula.js'teki küme parantezi
 
-const EN = {
-  bolum: { bir: 'one', iki: 'two', üç: 'three', dört: 'four', beş: 'five', altı: 'six', kırılma: 'break', drop: 'drop', 'tema geri': 'theme returns' },
-  mode: ['Locrian', 'Phrygian', 'Aeolian', 'Dorian', 'Mixolydian', 'Ionian', 'Lydian'],
-  kalip: { 'ara vuruş': 'offbeat', 'vuruş öncesi': 'before the beat', 'vuruş sonrası': 'after the beat', üçlü: 'threes', videodaki: 'original' },
-  renk: { kuru: 'dry', derin: 'deep', parlak: 'bright', siki: 'tight', genis: 'wide' },
-  tini: { testere: 'saw', kesik: 'clipped', karisik: 'mixed', kayan: 'sliding', oyuk: 'hollow', kare: 'square' },
-};
 const SOZ = {
   tr: { alt: 'müziğin tamamı tek bir formül' },
   en: { alt: 'the whole track is one formula' },
@@ -147,22 +141,12 @@ export class Kayit {
     g.restore();
   }
 
-  // üstteki yazı: Türkçede sayfadakinin aynısı, İngilizcede sayfanın bilgilerinden
-  texts(page, info) {
-    if (this.lang !== 'en') return [page.name, info.tr];
-    const name = page.name.split(' · ').map((w) => EN.bolum[w] ?? w).join(' · ');
-    const mode = EN.mode[MODE_NAMES.indexOf(page.mode)] ?? page.mode;
-    const kalip = page.kalip ? ` · ${EN.kalip[page.kalip] ?? page.kalip}` : '';
-    const renk = info.renk ? ` · color: ${EN.renk[info.renk]}` : '';
-    const tini = info.tini ? ` · tone: ${EN.tini[info.tini]}` : '';
-    return [name, `${page.key} ${mode} · ${info.bpm} BPM · journey ${page.journey}${kalip}${renk}${tini}`];
-  }
-
-  // her karede: çalan sayfa, kalemin konumu; info: { tr: sayfadaki bilgi yazısı, bpm, renk, tini }
+  // her karede: çalan sayfa, kalemin konumu; info: { bpm, renk, tini } (bilgi satırı için)
   draw(page, x, info) {
     if (!this.rec) return;
     const { g } = this;
-    const [bolum, bilgi] = this.texts(page, info);
+    const bolum = pageName(page.name, this.lang);
+    const bilgi = infoLine(page, info, this.lang);
     g.setTransform(S, 0, 0, S, 0, 0);
     g.globalCompositeOperation = 'source-over';
     g.fillStyle = getComputedStyle(this.kagit).backgroundColor;

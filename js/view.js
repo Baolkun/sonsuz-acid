@@ -2,6 +2,7 @@
 // Her sayfa x = −8'de başlar; kalemler (kırmızı noktalar) ilerledikçe eğriler çizilir, sayfa bitince kâğıt temizlenir.
 
 import { kickY, melodyY, hatY, clapY, padY, perkY } from './formula.js';
+import { t } from './dil.js';
 
 const X_MIN = -10.5;
 const X_MAX = 11.5;
@@ -46,7 +47,7 @@ export class View {
       g.fillStyle = 'rgba(19, 20, 15, .55)';
       g.font = 'italic 17px "STIX Two Text", "Times New Roman", serif';
       g.textAlign = 'center';
-      g.fillText('▶ Çal’a bas; formül buraya çizilecek', X(0), Y(1.2));
+      g.fillText(t('▶ Çal’a bas; formül buraya çizilecek'), X(0), Y(1.2));
       g.textAlign = 'left';
       return;
     }

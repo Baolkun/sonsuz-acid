@@ -9,6 +9,7 @@ import { renderFormula, MODE_NAMES, mod } from './formula.js';
 import { Ses } from './ses.js';
 import { View } from './view.js';
 import { Kayit } from './kayit.js';
+import { t, word, setLang, infoLine, pageName, lang } from './dil.js';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
@@ -105,7 +106,7 @@ function setOto(on) {
     if (shown) showInfo(shown);
   }
   $('oto').setAttribute('aria-pressed', String(on));
-  $('oto').textContent = on ? 'Kendi çeviriyor' : 'Kendi çevirsin';
+  $('oto').textContent = t(on ? 'Kendi çeviriyor' : 'Kendi çevirsin');
   if (on) eller.start(knobValues());
   for (const id in KNOBS) $(id).closest('.ayar').classList.toggle('oto', on);
 }
@@ -194,23 +195,24 @@ function hamle(kind) {
 
 let renk = null; // ellerin bu sayfaya verdiği renk
 let tini = null; // ve acid sesinin tınısı
+// bilgi satırına giden renk ve tını adları (Türkçe asılları; dil.js çevirir)
+const looks = () => ({ bpm, renk: oto && renk ? RENKLER[renk].ad : null, tini: oto && tini ? TINILAR[tini].ad : null });
 function showInfo(page) {
-  const r = (oto && renk ? ` · renk: ${RENKLER[renk].ad}` : '') + (oto && tini ? ` · tını: ${TINILAR[tini].ad}` : '');
   // kâğıt da sayfanın rengini alır
   if (oto && renk) document.querySelector('.kagit').style.setProperty('--kagit', RENKLER[renk].kagit);
   else document.querySelector('.kagit').style.removeProperty('--kagit');
-  $('bilgi').textContent = `${page.key} ${page.mode} · ${bpm} BPM · yolculuk ${page.journey}${page.kalip ? ` · ${page.kalip}` : ''}${r}`;
+  $('bilgi').textContent = infoLine(page, looks());
 }
 
 function showPage(page) {
   shown = page;
-  $('bolum').textContent = page.name;
-  $('sayac').textContent = `${besteci.locked ? 'kilitli · ' : ''}${page.index}/${page.count}`;
+  $('bolum').textContent = pageName(page.name);
+  $('sayac').textContent = `${besteci.locked ? `${t('kilitli')} · ` : ''}${page.index}/${page.count}`;
   showInfo(page);
   const box = $('formul');
   // yeniden yazılınca elle oynatılan sayı seçili kalsın
   const focused = box.contains(document.activeElement) ? document.activeElement.dataset.e : null;
-  box.innerHTML = renderFormula(page.sp);
+  box.innerHTML = renderFormula(page.sp, lang === 'en');
   for (const el of box.querySelectorAll('.p')) if (page.changed.includes(el.dataset.k) || page.changed.includes(el.dataset.e)) el.classList.add('degisti');
   if (focused) box.querySelector(`[data-e="${focused}"]`)?.focus({ preventScroll: true });
   $('oyna').hidden = false;
@@ -257,9 +259,9 @@ function shoot() {
   const page = pages.find((p) => beat >= p.beat && beat < p.beat + PAGE) || pages[0];
   if (page !== shown) showPage(page);
   kayit.lang = $('kayitDil').value;
-  kayit.draw(page, beat - page.beat - 8, { tr: $('bilgi').textContent, bpm, renk: oto && renk, tini: oto && tini });
-  const t = Math.floor(kayit.seconds);
-  $('kayitBtn').textContent = `■ Bitir ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  kayit.draw(page, beat - page.beat - 8, looks());
+  const s = Math.floor(kayit.seconds);
+  $('kayitBtn').textContent = `■ ${t('Bitir')} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 requestAnimationFrame(frame);
 
@@ -289,7 +291,7 @@ async function toggle() {
     kayit.pause(false);
   }
   busy = false;
-  $('cal').textContent = playing ? '❚❚ Durdur' : '▶ Çal';
+  $('cal').textContent = t(playing ? '❚❚ Durdur' : '▶ Çal');
 }
 
 const volume = () => (num('ses') / 100) ** 2;
@@ -322,10 +324,10 @@ const SHOW = {
   filtre: (v) => (v > 0 ? `+${v}` : String(v).replace('-', '−')),
   kuyruk: () => ms(soundParams().decay),
   // kaymanın neredeyse bittiği süre: e üssü 3'e varınca (%95)
-  kayma: (v) => (v ? ms((3 * 60) / (bpm * 4) / slideK(v)) : 'yok'),
-  dalga: (v) => (v === 0 ? 'testere' : v === 100 ? 'kare' : `%${v} kare`),
-  yanki: (v) => (v ? String(v) : 'yok'),
-  ruh: (v) => MODE_NAMES[Math.round((v / 100) * 6)],
+  kayma: (v) => (v ? ms((3 * 60) / (bpm * 4) / slideK(v)) : t('yok')),
+  dalga: (v) => (v === 0 ? t('testere') : v === 100 ? t('kare') : lang === 'en' ? `${v}% square` : `%${v} kare`),
+  yanki: (v) => (v ? String(v) : t('yok')),
+  ruh: (v) => word(MODE_NAMES[Math.round((v / 100) * 6)]),
   aralik: (v) => `mod ${v}`,
 };
 function showValue(input) {
@@ -352,6 +354,20 @@ document.addEventListener('keydown', (e) => {
 $('dolguBtn').addEventListener('click', () => playing && dolgu());
 $('kirilmaBtn').addEventListener('click', () => playing && hamle('kirilma'));
 $('dropBtn').addEventListener('click', () => playing && hamle('drop'));
+// sayfanın dili: sabit yazılar dil.js'te çevrilir, JavaScript'in yazdıkları burada yeniden yazılır
+function applyLang() {
+  setLang($('dil').value);
+  $('cal').textContent = t(playing ? '❚❚ Durdur' : '▶ Çal');
+  $('oto').textContent = t(oto ? 'Kendi çeviriyor' : 'Kendi çevirsin');
+  if (!kayit.active) $('kayitBtn').textContent = t('● Video kaydet');
+  for (const el of controls) if (el.type === 'range') showValue(el);
+  if (shown) showPage(shown);
+}
+$('dil').addEventListener('change', () => {
+  $('kayitDil').value = $('dil').value; // video da sayfanın dilinde; istenirse ayrıca değişir
+  applyLang();
+  save();
+});
 // video: çalmıyorsa çalmaya da başlar; ikinci basış kaydı bitirip dosyayı indirir
 $('kayitBtn').addEventListener('click', async () => {
   if (busy) return;
@@ -359,7 +375,7 @@ $('kayitBtn').addEventListener('click', async () => {
   if (kayit.active) {
     await kayit.stop();
     btn.setAttribute('aria-pressed', 'false');
-    btn.textContent = '● Video kaydet';
+    btn.textContent = t('● Video kaydet');
     return;
   }
   if (!playing) await toggle();
@@ -461,6 +477,7 @@ $('kilit').addEventListener('click', () => {
 $('yeni').addEventListener('click', newJourney);
 $('sifirla').addEventListener('click', () => {
   for (const el of controls) {
+    if (el.id === 'dil' || el.id === 'kayitDil') continue; // dil sıfırlanmaz
     const def = el.tagName === 'SELECT' ? ([...el.options].find((o) => o.defaultSelected) || el.options[0]).value : el.defaultValue;
     if (el.value === def) continue;
     el.value = def;
@@ -556,6 +573,11 @@ box.addEventListener('keydown', (e) => {
 // ---------- başlangıç ----------
 
 load();
+// kayıtlı dil yoksa tarayıcının dili: Türkçe değilse İngilizce
+const saved = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } })();
+if (!saved.dil) $('dil').value = (navigator.language || '').startsWith('tr') ? 'tr' : 'en';
+if (!saved.kayitDil) $('kayitDil').value = $('dil').value;
+applyLang();
 for (const el of controls) if (el.type === 'range') showValue(el);
 const st = besteci.settings;
 st.mood = num('ruh') / 100;
