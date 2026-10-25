@@ -12,7 +12,11 @@ import { createRng } from './rng.js';
 import { MODE_NAMES, mod } from './formula.js';
 
 export const PAGE = 16; // vuruş
-export const NAMES = ['bir', 'iki', 'üç', 'dört', 'beş', 'altı'];
+// yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
+// birden geri gelir)
+export const NAMES = ['bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'kırılma'];
+// yolculuğun sonu: kırılma → yükseliş → drop (beşinci bölüm iki sayfa, sekiz ölçü)
+const ENDING = [6, 5, 4, 4];
 const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 // akor kökleri, dizide basamak olarak; her ölçüye bir tane. Hepsi −2 … 4 arasında, bas tonikten fazla uzaklaşmaz
 const PROGS = [[0, 0, -2, -2], [0, -2, 2, -1], [0, -1, -2, -1], [0, 0, 3, 4], [0, -2, -1, 0], [0, 3, -2, 4], [0, 0, 0, 0]];
@@ -69,13 +73,16 @@ function features(stage, density) {
   // hat ve clap techno'daki gibi sırayla girer: önce sade hat (iki), sonra clap (üç), yoğun bölümlerde sık hat (dört …)
   const f = {
     kick: 'four', chord: stage > 0, fill: false, hocket: false, blip: false, oct: false, riser: false, lift: false,
-    hat: [0, 1, 1, 2, 2, 2][stage], clap: stage >= 2,
+    hat: [0, 1, 1, 2, 2, 2, 1][stage], clap: stage >= 2 && stage !== 6,
   };
   if (stage === 0) {
     f.kick = 'bar';
     f.lift = true;
   } else if (stage === 1) {
     f.kick = 'halfFour';
+  } else if (stage === 6) {
+    f.kick = 'none';
+    f.fill = true;
   } else if (stage <= 3) {
     f.kick = 'roll';
     f.fill = true;
@@ -182,7 +189,7 @@ export class Besteci {
     this.newWanted = false;
     this.at = 0;
     if (this.journey === 1) {
-      this.plan = [0, 1, 2, 3, 4, 5];
+      this.plan = [0, 1, 2, 3, ...ENDING];
       // kalıp seçildiyse ilk yolculuk da onunla çalar
       if (settings.kalip && settings.kalip !== s.kalip) this.useKalip(s, settings.kalip);
       return;
@@ -205,7 +212,9 @@ export class Besteci {
     // altı bölüm; ikisi tekrar edip değişerek uzar
     const order = [0, 1, 2, 3, 4, 5];
     for (const e of rng.shuffle(settings.density > 0.5 ? [2, 3, 4] : [1, 2, 4]).slice(0, 2)) order.splice(order.indexOf(e) + 1, 0, e);
-    this.plan = order;
+    // yolculuk kırılma, yükseliş ve drop'la biter (yükseliş sona taşınır)
+    order.splice(order.indexOf(5), 1);
+    this.plan = [...order, ...ENDING];
   }
 
   // küçük bir değişiklik, tek bir şey; desen kalıbın içinde kalır: kayma ya da bükme yer değiştirir (ya da gelip
@@ -278,6 +287,7 @@ export class Besteci {
       blip: f.blip ? s.blip : 0, oct, riser: f.riser ? { w: s.riser } : null, lift: f.lift ? s.lift : null,
       hat: H ? { on: H.on.slice(), open: H.open.slice(), from: enter('hat'), roll: !!s.roll } : null,
       clap: C ? { beats: C.beats.slice(), son: C.son, from: enter('clap') } : null,
+      gap: !!s.gap,
     };
   }
 
@@ -286,7 +296,8 @@ export class Besteci {
     const stage = this.settings.stage ?? page.stage;
     const { s } = page.snap;
     page.sp = this.build(stage, s);
-    page.name = NAMES[stage];
+    page.name = NAMES[stage] + (s.drop ? ' · drop' : '');
+    page.drop = !!s.drop;
     page.key = noteName(52 + s.base);
     page.mode = MODE_NAMES[s.c];
     // kalıbın adı; desenin sayıları elle değiştiyse yok
@@ -310,6 +321,9 @@ export class Besteci {
     // hat dolgusu cümle sonunda: bölüm değişmeden önceki çift sayfada (sekiz ölçü bitti) ya da yolculuğun son sayfasında
     const after = this.plan[this.at + 1];
     s.roll = f.hat > 1 && (after === undefined || (run % 2 === 0 && (settings.stage ?? after) !== eff));
+    // drop: yükselişten sonra beşinci bölüm; yükselişin son yarım vuruşu sessiz kalır (drop öncesi boşluk)
+    s.drop = settings.stage === null && !fresh && prev?.eff === 5 && eff === 4;
+    s.gap = settings.stage === null && eff === 5 && after === 4;
     // yeni giren hat ya da clap sayfanın ikinci yarısında başlar
     s.enter = { hat: f.hat > 0 && !(prev && !fresh && prev.f.hat), clap: f.clap && !(prev && !fresh && prev.f.clap) };
     if (this.at === 0) s.enter = { hat: false, clap: false }; // yolculuk başında hepsi birden: düşüş

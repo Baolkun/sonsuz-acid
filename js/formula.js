@@ -247,6 +247,7 @@ export function renderFormula(sp) {
   }
   if (sp.riser) defs.push(`${V('R')} = ⌊${fr(`${op('max')}(0, ${X})`, N('riser', sp.riser.w, 'riser'))}⌋`);
   defs.push(`${V('r')} = (${sp.prog.map((d, i) => N('prog', d, `prog.${i}`)).join(', ')})[⌊${fr(`${X} + 8`, 4)}⌋]`);
+  if (sp.gap) defs.push(`${X} ≥ 7.5: ${V('y')} tanımsız (drop öncesi boşluk)`);
   defs.push(`${V('S')}(${V('m')}) = ⌊${fr(`12${V('m')} + ${N('c', sp.c, 'c')}`, 7)}⌋`);
   return `<div class="denklem">${V('y')} = ${main}</div><div class="tanimlar">${defs.map((d) => `<span>${d}</span>`).join('')}</div>`;
 }

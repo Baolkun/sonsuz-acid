@@ -6,6 +6,7 @@
 //   son ölçü: üç ölçü yerinde durur, dördüncü ölçüde itilir
 //   yükseliş: filtre, rezonans ve doygunluk sayfa sonuna doğru hızlanarak tırmanır
 //   düşüş: yeni yolculuğun ilk vuruşunda filtre kapanır (yükselişten iniş), sonra yeniden açılmaya başlar
+//   drop: yükselişten sonra her şey geri gelince de düşüş
 //   kırılma: kick susunca filtre kapanır, rezonans keskinleşir, kuyruk uzar, yankı açılır
 // Bölümün ilk sayfasında bir hareket, tekrarında öteki gelir. İtişten (son ölçü, yükseliş) sonra yeni sayfanın ilk
 // vuruşunda geri inilir. Yankı cümle sonunda (son iki vuruş) fırlatılır, yeni ölçüde söner. Rastgele olan yalnızca
@@ -17,10 +18,10 @@ export const KNOBS = {
   filtre: [-100, 100], rezonans: [0, 100], zarf: [0, 100], kuyruk: [0, 100], vurgu: [0, 100], doygunluk: [0, 100], yanki: [0, 100],
 };
 const HOLD = 8; // vuruş: bırakılan sürgü bu kadar elde kalır
-const ENERGY = [0.1, 0.3, 0.5, 0.7, 0.8, 1]; // bölüm bir … altı
-const DECAY_BY_STAGE = [-8, -2, 8, 4, -6, 10]; // kuyruk: dolguda ve yükselişte uzun, hokette kısa
+const ENERGY = [0.1, 0.3, 0.5, 0.7, 0.8, 1, 0.35]; // bölüm bir … altı, kırılma
+const DECAY_BY_STAGE = [-8, -2, 8, 4, -6, 10, 14]; // kuyruk: dolguda ve yükselişte uzun, hokette kısa
 // bölüm → filtrenin hareketleri: bölümün ilk sayfasında ilki, tekrarında sonraki
-export const GESTURES = [['tirmanis'], ['basamak', 'nefes8'], ['nefes8', 'nefes4'], ['son', 'basamak'], ['nefes4', 'son'], ['yukselis']];
+export const GESTURES = [['tirmanis'], ['basamak', 'nefes8'], ['nefes8', 'nefes4'], ['son', 'basamak'], ['nefes4', 'son'], ['yukselis'], ['kirilma']];
 const PUSH = new Set(['son', 'yukselis']); // ardından ilk vuruşta geri inilir
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -78,11 +79,12 @@ export class Eller {
   // info: { stage, sp, index, count, fresh (yolculuğun ilk sayfası), variant (bölümün kaçıncı sayfası, 0'dan),
   //         next (sıradaki bölüm; null: yolculuk bitiyor), change (sıradaki bölüm başka) }
   design(info) {
-    const { stage, sp, fresh, variant = 0, next, change } = info;
+    const { stage, sp, fresh, variant = 0, next, change, drop } = info;
     const e = this.energy(info);
     const quiet = !sp.kick; // kick susuyor: kırılma
     const list = GESTURES[stage];
-    const kind = quiet ? 'kirilma' : fresh && this.last ? 'dusus' : sp.riser ? 'yukselis' : list[variant % list.length];
+    // drop'ta da düşüş: filtre ilk vuruşta kapanır, sonra açılır
+    const kind = quiet ? 'kirilma' : (fresh && this.last) || drop ? 'dusus' : sp.riser ? 'yukselis' : list[variant % list.length];
     const back = PUSH.has(this.last); // itişten sonra ilk vuruşta geri inilir
     const A = 10 + 12 * e; // filtrenin hareket genişliği
     const lvl = -25 + 40 * e + jit(4); // bölümün filtre seviyesi

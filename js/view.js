@@ -49,7 +49,8 @@ export class View {
     const end = Math.min(x, 8 - 1e-6);
     if (end < -8) return;
     const { sp } = page;
-    const rows = [(v) => melodyY(sp, v), (v) => kickY(sp, v), (v) => hatY(sp, v), (v) => clapY(sp, v)];
+    // drop öncesi boşlukta (son yarım vuruş) satırlar tanımsız
+    const rows = [melodyY, kickY, hatY, clapY].map((f) => (v) => (sp.gap && v >= 7.5 ? null : f(sp, v)));
     for (const row of rows) this.curve(row, end, X, Y);
     g.fillStyle = RED;
     for (const row of rows) {

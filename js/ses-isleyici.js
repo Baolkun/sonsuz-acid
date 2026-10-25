@@ -128,6 +128,7 @@ class FormulSes extends AudioWorkletProcessor {
     this.cs1 = 0;
     this.cs2 = 0;
     this.seed = 22222; // gürültü
+    this.gapG = 1; // drop öncesi boşlukta 0
     // oda
     this.rLines = ROOM_MS.map((ms) => new Float32Array(Math.round((ms * sampleRate) / 1000)));
     this.rPos = new Int32Array(ROOM_MS.length);
@@ -207,9 +208,11 @@ class FormulSes extends AudioWorkletProcessor {
       if (!page || beat < page.beat || beat >= page.beat + PAGE) page = pageAt(pages, beat);
       let mel = 0;
       let kickOn = false;
+      let gapT = 1;
       if (page) {
         const { sp } = page;
         const x = beat - page.beat - 8;
+        if (sp.gap && x >= 7.5) gapT = 0; // drop öncesi boşluk: son yarım vuruş sessiz, yalnızca oda yankısı kalır
 
         // melodi: perde sıçrayınca yeni nota; vurgulu adıma girince perde aynı kalsa da nota yeniden vurulur (303'teki gibi)
         const y = melodyY(sp, x);
@@ -375,9 +378,10 @@ class FormulSes extends AudioWorkletProcessor {
       this.cAge += 1 / sr;
       // pompa: kick'in vurduğu an kısılır (başı 4 ms'de iner, tık olmasın), sonra geri gelir; kick yoksa düz
       const duck = 1 - now.pump * PUMP_DEPTH * Math.exp(-this.kAge / PUMP_TIME) * (1 - Math.exp(-this.kAge / 0.004));
-      const melOut = mel * MEL * comp * duck;
-      const hatOut = hat * now.hat;
-      const clapOut = clap * now.clap;
+      this.gapG += (gapT - this.gapG) * this.fade;
+      const melOut = mel * MEL * comp * duck * this.gapG;
+      const hatOut = hat * now.hat * this.gapG;
+      const clapOut = clap * now.clap * this.gapG;
       // oda: sönme süresi (RT60) 0,8 … 2,2 s, Oda ayarıyla uzar
       let wet = 0;
       if (now.room > 0.001) {
@@ -403,7 +407,7 @@ class FormulSes extends AudioWorkletProcessor {
         }
         wet *= (ROOM_OUT / 8) * now.room * (0.6 + 0.4 * duck);
       }
-      const v = (melOut + kick * now.kick + hatOut + clapOut + wet) * this.level;
+      const v = (melOut + kick * now.kick * this.gapG + hatOut + clapOut + wet) * this.level;
       // tavan: 0,8'e kadar dokunmaz, üstünü yumuşakça 1'in altında tutar; uç ayarlarda bile ses patlamaz
       const a = Math.abs(v);
       out[i] = a <= 0.8 ? v : Math.sign(v) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2));

@@ -71,7 +71,7 @@ function automate() {
   if (besteci.locked) next = stage;
   const beat = beatAt(ctx.currentTime);
   const values = eller.step(beat, page, {
-    stage, sp: page.sp, index: page.index, count: page.count, fresh: page.fresh && !besteci.locked, next, change: next !== stage,
+    stage, sp: page.sp, index: page.index, count: page.count, fresh: page.fresh && !besteci.locked, next, change: next !== stage, drop: page.drop && !besteci.locked,
     // bölümün kaçıncı sayfası (tekrarında başka hareket); kilitliyken sayfa döndükçe hareketler sırayla değişir
     variant: besteci.locked ? page.no : (page.snap.prev?.run ?? 1) - 1,
   });
