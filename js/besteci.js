@@ -65,6 +65,10 @@ export const PERKLER = {
   tom: { ad: 'tom (cümle sonu)', ses: 'tom', m: 32, on: [26, 29, 30], kat: 2, w: 2 },
   tomIki: { ad: 'tom (yarım ölçü)', ses: 'tom', m: 16, on: [10, 14], kat: 2, w: 1 },
 };
+// tema: melodiyi yapan sayılar. Yolculuğun üçüncü bölümünde (melodi ilk kez tam otururken) saklanır, desen sonra
+// değişe değişe başka yerlere gider; kırılma ve yükselişten sonra drop'ta tema olduğu gibi geri döner (parçanın
+// "kanca"sı), ardından yine çeşitlenir
+const TEMA = ['kalip', 'M', 'n', 'p', 'acc', 'bend', 'slide', 'prog', 'fill', 'hocket'];
 const perkIds = (kat) => Object.keys(PERKLER).filter((id) => PERKLER[id].kat === kat);
 // ağırlığa göre seçer; not: seçilmeyecek olan
 function weighted(rng, table, ids, not) {
@@ -130,7 +134,7 @@ export class Besteci {
     this.s = {
       kalip: 'video', M: null, n: 5, p: 2, q: 32, acc: 2, bend: 4, slide: null, base: -18, c: 2, prog: [0, 0, 0, 0],
       fill: { u: 3, v: 6 }, hocket: { u: 3, v: 1, chirp: 0.4 }, kick: { at: 4, L: 4 }, lift: 6, riser: 3, blip: 0.25,
-      hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false,
+      hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false, tema: null, geri: false,
     };
   }
 
@@ -204,6 +208,7 @@ export class Besteci {
     this.journey++;
     this.newWanted = false;
     this.at = 0;
+    s.tema = null;
     if (this.journey === 1) {
       this.plan = [0, 1, 2, 3, ...ENDING];
       // kalıp seçildiyse ilk yolculuk da onunla çalar
@@ -318,7 +323,7 @@ export class Besteci {
     const stage = this.settings.stage ?? page.stage;
     const { s } = page.snap;
     page.sp = this.build(stage, s);
-    page.name = NAMES[stage] + (s.drop ? ' · drop' : '');
+    page.name = NAMES[stage] + (s.drop ? ' · drop' : '') + (s.geri ? ' · tema geri' : '');
     page.drop = !!s.drop;
     page.key = noteName(52 + s.base);
     page.mode = MODE_NAMES[s.c];
@@ -365,6 +370,17 @@ export class Besteci {
       if (f.perk !== prev.f.perk) changed.add('perk');
       if (f.pad && !prev.f.pad) changed.add('pad');
       if (f.chord && !prev.f.chord) changed.add('acc');
+    }
+    // tema: üçüncü bölümün ilk sayfasında saklanır, drop'ta geri döner
+    s.geri = false;
+    if (settings.stage === null && !s.tema && eff === 2) s.tema = clone(Object.fromEntries(TEMA.map((k) => [k, s[k]])));
+    if (s.drop && s.tema) {
+      // kalıp elle seçildiyse desen onda kalır, yalnızca akorlar ve notalar döner
+      const keys = settings.kalip && settings.kalip !== s.tema.kalip ? ['prog', 'fill', 'hocket'] : TEMA;
+      const back = keys.filter((k) => JSON.stringify(s[k]) !== JSON.stringify(s.tema[k]));
+      for (const k of keys) s[k] = clone(s.tema[k]);
+      for (const k of back) changed.add(k === 'kalip' ? 'p' : k);
+      s.geri = back.length > 0;
     }
     // filtre yolculuk boyunca açılır, yeni yolculukta yeniden kapanır
     const count = this.plan.length;
