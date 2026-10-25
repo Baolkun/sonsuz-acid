@@ -11,6 +11,8 @@
 // yankı tempoya oturur (noktalı sekizlik) ve yalnızca melodiye uygulanır.
 // Pompalama (sidechain): kick her vurduğunda melodi bir anlığına kısılır ve ~150 ms'de geri gelir; techno'nun
 // "nefes alan" hissi. Hat ve clap pompalanmaz.
+// Oda yankısı (reverb): sekiz gecikme hattı birbirine karışarak geri beslenir (FDN). Clap'e çok, hat'e biraz, melodiye
+// az gider; yankının altı kesilir, bas çamurlaşmasın; her dönüşte tizi koyulaşır.
 // Hat satırı: 808'deki gibi altı kare dalga (uyumsuz frekanslarda, metalik) ve biraz gürültü, tizi süzülerek. Satır
 // tanımlı olmaya başlayınca vurulur (swing de satırda), şiddeti satırdaki v; açık hat uzun söner, sonraki hat onu keser.
 // Clap satırı: gürültü, ortada süzülür; başı birkaç milisaniye arayla üç kez çarpar (eller), ardından kısa bir kuyruk.
@@ -39,6 +41,11 @@ const CLICK = 0.35; // başındaki tık…
 const CLICK_TIME = 0.0015; // …bu sürede söner
 const PUMP_DEPTH = 0.7; // tam pompada melodi bu kadar kısılır…
 const PUMP_TIME = 0.1; // s: …ve bu süreyle geri gelir
+const ROOM_MS = [29.7, 37.1, 41.1, 43.7, 53.3, 59.9, 67.3, 73.1]; // gecikme hatları
+const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7 };
+const ROOM_HP = 250; // Hz: yankıya giden sesin altı kesilir
+const ROOM_DAMP = 5000; // Hz: hatların içinde tizi koyulaştırır
+const ROOM_OUT = 0.6;
 const HAT = 0.18;
 const CLAP = 0.24;
 const HAT_DECAY = [0.022, 0.13]; // s: kapalı, açık
@@ -49,7 +56,7 @@ const CLAP_OCT = 5.2; // clap: ≈ 1,5 kHz
 const CLAP_Q = 0.8; // 1/Q
 const CLAP_GAP = 0.011; // s: ellerin çarpma arası
 const CLAP_TAIL = 0.11; // s
-const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5 };
+const DEFAULTS = { cut: 0, res: RES, env: ENV, decay: DECAY, drive: 0, kick: KICK, accent: 0, wave: 0, echo: 0, hat: HAT, clap: CLAP, pump: 0.5, room: 0.35 };
 const DRIVE_GAIN = 2; // doygunlukta kırpma eşiği (filtre çıkışı 3,5'e kadar çıkıyor)
 const DRIVE_POW = 0.4; // sürüş arttıkça düzey bu üsle geri alınır, açınca ses patlamasın ya da kısılmasın
 const ACC_ENV = 1.2; // oktav: tam vurguda filtre zarfına eklenen
@@ -121,6 +128,14 @@ class FormulSes extends AudioWorkletProcessor {
     this.cs1 = 0;
     this.cs2 = 0;
     this.seed = 22222; // gürültü
+    // oda
+    this.rLines = ROOM_MS.map((ms) => new Float32Array(Math.round((ms * sampleRate) / 1000)));
+    this.rPos = new Int32Array(ROOM_MS.length);
+    this.rLp = new Float64Array(ROOM_MS.length);
+    this.rHp = 0;
+    this.rHpA = 1 - Math.exp((-TAU * ROOM_HP) / sampleRate);
+    this.rDampA = 1 - Math.exp((-TAU * ROOM_DAMP) / sampleRate);
+    this.rOut = new Float64Array(ROOM_MS.length);
     this.prm = { ...DEFAULTS }; // istenen ayarlar
     this.now = { ...DEFAULTS }; // yumuşatılmış hâlleri
     const per = (s) => 1 - Math.exp(-1 / (s * sampleRate));
@@ -188,6 +203,7 @@ class FormulSes extends AudioWorkletProcessor {
       now.hat += (prm.hat - now.hat) * sm;
       now.clap += (prm.clap - now.clap) * sm;
       now.pump += (prm.pump - now.pump) * sm;
+      now.room += (prm.room - now.room) * sm;
       if (!page || beat < page.beat || beat >= page.beat + PAGE) page = pageAt(pages, beat);
       let mel = 0;
       let kickOn = false;
@@ -359,7 +375,35 @@ class FormulSes extends AudioWorkletProcessor {
       this.cAge += 1 / sr;
       // pompa: kick'in vurduğu an kısılır (başı 4 ms'de iner, tık olmasın), sonra geri gelir; kick yoksa düz
       const duck = 1 - now.pump * PUMP_DEPTH * Math.exp(-this.kAge / PUMP_TIME) * (1 - Math.exp(-this.kAge / 0.004));
-      const v = (mel * MEL * comp * duck + kick * now.kick + hat * now.hat + clap * now.clap) * this.level;
+      const melOut = mel * MEL * comp * duck;
+      const hatOut = hat * now.hat;
+      const clapOut = clap * now.clap;
+      // oda: sönme süresi (RT60) 0,8 … 2,2 s, Oda ayarıyla uzar
+      let wet = 0;
+      if (now.room > 0.001) {
+        let send = ROOM_SEND.mel * melOut + ROOM_SEND.hat * hatOut + ROOM_SEND.clap * clapOut;
+        this.rHp += (send - this.rHp) * this.rHpA;
+        send -= this.rHp;
+        const rt = 0.8 + 1.4 * now.room;
+        const lines = this.rLines;
+        const o = this.rOut;
+        let sum = 0;
+        for (let k = 0; k < 8; k++) {
+          o[k] = lines[k][this.rPos[k]];
+          sum += o[k];
+          wet += o[k];
+        }
+        const mix = sum / 4; // Householder: x − 2/N · Σ
+        for (let k = 0; k < 8; k++) {
+          const line = lines[k];
+          const g = 10 ** ((-3 * line.length) / (sr * rt));
+          this.rLp[k] += (o[k] - mix - this.rLp[k]) * this.rDampA;
+          line[this.rPos[k]] = send + g * this.rLp[k];
+          if (++this.rPos[k] === line.length) this.rPos[k] = 0;
+        }
+        wet *= (ROOM_OUT / 8) * now.room * (0.6 + 0.4 * duck);
+      }
+      const v = (melOut + kick * now.kick + hatOut + clapOut + wet) * this.level;
       // tavan: 0,8'e kadar dokunmaz, üstünü yumuşakça 1'in altında tutar; uç ayarlarda bile ses patlamaz
       const a = Math.abs(v);
       out[i] = a <= 0.8 ? v : Math.sign(v) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2));
