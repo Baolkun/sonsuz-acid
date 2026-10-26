@@ -2,7 +2,7 @@
 // Her sayfa x = −8'de başlar; kalemler (kırmızı noktalar) ilerledikçe eğriler çizilir, sayfa bitince kâğıt temizlenir.
 
 import { kickY, melodyY, hatY, clapY, padY, perkY, breakY } from './formula.js?v=95ac14e5';
-import { t } from './dil.js?v=2f6f4e64';
+import { t } from './dil.js?v=d016b217';
 
 const X_MIN = -10.5;
 const X_MAX = 11.5;

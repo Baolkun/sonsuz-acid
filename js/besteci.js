@@ -94,7 +94,7 @@ export const DOGRAMALAR = [
   { sig: [0, 1, 2, 3, 4, 5, 6, 3], rho: [16, 16, 16, 16, 16, 16, 16, 8] },
   { sig: [0, 1, 4, 5, 0, 1, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
 ];
-// DJ seti: tür iki yolculukta bir komşu türe geçer, DJ'lerin miksledikleri gibi (tempoları yakın, davulu akraba):
+// DJ seti: tür her yolculukta komşu bir türe geçer, DJ'lerin miksledikleri gibi (tempoları yakın, davulu akraba):
 // techno'dan Amen'e, jungle'dan drum & bass'e, breakcore'dan speedcore'a, happy hardcore'dan gabber'a. null: tür yok (acid techno)
 export const DJ_YOL = {
   techno: ['amen', 'footwork', 'happy'],
@@ -110,7 +110,7 @@ export const DJ_YOL = {
   terror: ['gabber', 'speed', 'french'],
   speed: ['terror', 'core'],
 };
-export const DJ_TUR_YOLCULUK = 2; // tür kaç yolculukta bir değişir
+export const DJ_TUR_YOLCULUK = 1; // tür kaç yolculukta bir değişir
 export const KIRIK_PAY = [0, 0, 1, 2, 3]; // KIRIKLAR: jungle ve breakcore'da yolculuğun break'i (Amen iki pay)
 export const AMEN_DUZ = { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] };
 export const RHO = [16, 8, 4, 2, 1];
@@ -307,7 +307,7 @@ export class Besteci {
     this.newWanted = false;
     this.at = 0;
     s.tema = null;
-    // DJ seti: tür iki yolculukta bir komşusuna geçer (yeni yolculuk düşüşle başlar, geçiş orada)
+    // DJ seti: tür her yolculukta komşusuna geçer (yeni yolculuk düşüşle başlar, geçiş orada)
     if (settings.dj && this.journey > 1 && ++s.djN >= DJ_TUR_YOLCULUK) {
       s.djN = 0;
       // bir önceki türe dönmez (set ilerler)
