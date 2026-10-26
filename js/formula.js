@@ -215,7 +215,7 @@ export const TURLER = {
     ad: 'mathcore', A: groups(MATH, 0), Q: groups(MATH, 1), ses: UZU, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
   },
 };
-// Jungle ve breakcore'da her yolculuk bir break çalar (KIRIKLAR[0] Amen). Dördü tidalcycles/Dirt-Samples'tan; her biri
+// Jungle ve breakcore'da her yolculuk bir break çalar (KIRIKLAR[0] Amen). Üçü tidalcycles/Dirt-Samples'tan; her biri
 // ölçülüp (tempo, ölçü başı, her on altılığın vuruşunun başladığı yer, ms) Amen gibi vuruşlarından kesildi. A ölçülen
 // vuruşlar: K kick, S snare, s hayalet, h hat (yalnız kaydı yeniden başlatır, kayıt ızgaradan kaymasın). g: düzey (tepesi
 // eşit ama ortalaması düşük kayıtlar), kat: kaydın kick'i yok, K'lerde türün kick'i de vurur. son: dilimin söndüğü
@@ -234,9 +234,6 @@ export const KIRIKLAR = [
       1680.9, 1793, 1896.1, 1990, 2120.3, 2192.1, 2302.5, 2391.6, 2510.5, 2574.6, 2685.9, 2783.2, 2875.1, 2971.8, 3085.6], 1.1),
   kirik('plead', 'dirt/breaks157_000_plead', 157.9, 'K.hsShh.K.S.h.hh',
     [2.9, 84.1, 188.9, 250.5, 382.6, 463.6, 576.8, 665.7, 766.7, 860.6, 959.5, 1051.5, 1144.5, 1241, 1330.5, 1437.5]),
-  // 125'lik hip-hop break'i: kick 1'de ve 3'ün çevresinde, snare 2 ve 4'te; jungle'da hızlandırılıp çalınır
-  kirik('stomp', 'dirt/breaks125_016_bllstmp', 124.7, 'K...S.hsh.K.SKh.',
-    [36.4, 137.6, 256.3, 359, 492.1, 579, 739.7, 877.9, 988, 1133.3, 1215.8, 1351.3, 1452.3, 1604, 1687.5, 1826.2], 1.7),
   kirik('rawcln', 'dirt/breaks165_000_rawcln', 162.4, 'KhhhShhhhhKhShhh',
     [0, 81.7, 179, 272.2, 353.3, 426.1, 525.8, 613.9, 712.2, 808.5, 887, 983.7, 1077.5, 1201, 1264.9, 1355.5], 1.4, true),
 ];

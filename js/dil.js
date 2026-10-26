@@ -113,7 +113,7 @@ export const EN = {
   'Kick deseni': 'Kick pattern',
   'bölüme göre': 'by section',
   'otomatik': 'auto',
-  "Break: Amen, jungle ve breakcore'da davulun çaldığı kayıt. Otomatik: jungle ve breakcore her yolculukta birini seçer (Amen'in payı iki kat). Birini seçince hep o çalar; aradaki farkı duymak için çalarken değiştir. Amen 152: Amen'in başka bir çalınışı. plead: sıkı, hat'i bol. stomp: 125'lik ağır hip-hop break'i, hızlanınca tok. rawcln: kick'siz hat ve snare kaydı, altında türün kick'i vurur": "Break: the recording the drums play in Amen, jungle and breakcore. Auto: jungle and breakcore pick one each journey (Amen counts double). Pick one and it always plays; switch while playing to hear the difference. Amen 152: another take of the Amen. plead: tight, lots of hats. stomp: a heavy 125 BPM hip-hop break, punchy when sped up. rawcln: a kickless hat-and-snare loop, the genre's kick plays under it",
+  "Break: Amen, jungle ve breakcore'da davulun çaldığı kayıt. Otomatik: jungle ve breakcore her yolculukta birini seçer (Amen'in payı iki kat). Birini seçince hep o çalar; aradaki farkı duymak için çalarken değiştir. Amen 152: Amen'in başka bir çalınışı. plead: sıkı, hat'i bol. rawcln: kick'siz hat ve snare kaydı, altında türün kick'i vurur": "Break: the recording the drums play in Amen, jungle and breakcore. Auto: jungle and breakcore pick one each journey (Amen counts double). Pick one and it always plays; switch while playing to hear the difference. Amen 152: another take of the Amen. plead: tight, lots of hats. rawcln: a kickless hat-and-snare loop, the genre's kick plays under it",
   'dörtlük': 'four on the floor',
   'ölçü başı': 'bar start',
   'yarım, sonra dörtlük': 'half, then four',

@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, TURLER, KIRIKLAR, mod } from './formula.js?v=cbd8f3e6';
+import { MODE_NAMES, TURLER, KIRIKLAR, mod } from './formula.js?v=95ac14e5';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
@@ -111,7 +111,7 @@ export const DJ_YOL = {
   speed: ['terror', 'core'],
 };
 export const DJ_TUR_YOLCULUK = 2; // tür kaç yolculukta bir değişir
-export const KIRIK_PAY = [0, 0, 1, 2, 3, 4]; // KIRIKLAR: jungle ve breakcore'da yolculuğun break'i (Amen iki pay)
+export const KIRIK_PAY = [0, 0, 1, 2, 3]; // KIRIKLAR: jungle ve breakcore'da yolculuğun break'i (Amen iki pay)
 export const AMEN_DUZ = { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] };
 export const RHO = [16, 8, 4, 2, 1];
 // şarkının bir sayfası: T her sekizliğin basamağı (32), A notanın başladığı sekizliklerden yeniden vurulanlar (ölçü başı ya
