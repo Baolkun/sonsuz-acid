@@ -37,7 +37,7 @@
 // var, aynı kanalda yeni vuruş eskisini birkaç milisaniyede keser; Amen kaydı kalıbın her vuruşunda kaydın o on
 // altılığından başlar (tempoya göre hızlanır, jungle'daki gibi perdesi de kalkar), sonraki vuruşa kadar akar.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=30fd0702';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=cbd8f3e6';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -85,7 +85,10 @@ const RIDE_HP = 4500; // Hz
 const CRASH_DECAY = 1.1; // s
 const SMP_GAIN = { K: 1.8, S: 1.5, C: 2.2, h: 1.2, o: 1.1, r: 0.9, X: 0.9, B: 2.1 }; // örneklerin düzeyi (tepe 1)
 const SMP_CUT = 0.003; // s: kesilen sesin sönüşü
-const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6, perk: 0.4, brk: 0.35 };
+// brk: kuru (gerçek breakcore kayıtlarında break'in yankısı az; 0,35'te orta bölge bulanıyordu)
+const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6, perk: 0.4, brk: 0.22 };
+const DR_A = 1 - Math.exp((-2 * Math.PI * 4000) / sampleRate); // tür davulunun parlatma süzgeci (4 kHz)
+const DR_TIZ = 0.8;
 const ROOM_HP = 250; // Hz: yankıya giden sesin altı kesilir
 const ROOM_DAMP = 5000; // Hz: hatların içinde tizi koyulaştırır
 const ROOM_OUT = 0.6;
@@ -206,6 +209,9 @@ class FormulSes extends AudioWorkletProcessor {
     this.snPh = new Float64Array(2);
     this.snHp = 0;
     this.snLp = 0;
+    this.drLp = 0;
+    this.subG = 1;
+    this.subGs = 1; // yumuşatılmış (sayfa sınırında tık olmasın)
     this.rdAge = 1;
     this.rdVel = 0;
     this.rd1 = 0;
@@ -440,6 +446,7 @@ class FormulSes extends AudioWorkletProcessor {
         const { sp } = page;
         const x = beat - page.beat - 8;
         this.subT = subHz(sp, x);
+        this.subG = (sp.amen && TURLER[sp.amen.tur]?.subG) || 1;
         sh = shepAt(sp, x);
         if (sp.glitch) {
           for (const g of sp.glitch) if (x >= g.x && x < g.x + g.d) gEv = g;
@@ -840,7 +847,7 @@ class FormulSes extends AudioWorkletProcessor {
         if (this.subPh >= 1) this.subPh -= 1;
         const env = SUB_HOLD + (1 - SUB_HOLD) * Math.exp(-this.age / SUB_DECAY);
         const subDuck = 1 - Math.min(1, 0.4 + now.pump) * 0.95 * Math.exp(-kA / 0.13) * (1 - Math.exp(-kA / 0.004));
-        subOut = Math.sin(TAU * this.subPh) * env * now.sub * subDuck * this.gapG;
+        subOut = Math.sin(TAU * this.subPh) * env * now.sub * subDuck * this.gapG * (this.subGs += 0.0005 * (this.subG - this.subGs));
       }
       // Shepard: frac p sıfırdan geçince sinüsler bir basamak kayar (en tizdeki duyulmazken en pese döner)
       let shOut = 0;
@@ -864,7 +871,10 @@ class FormulSes extends AudioWorkletProcessor {
       const hatOut = hat * now.hat * this.gapG;
       const clapOut = clap * now.clap * this.gapG;
       const perkOut = perk * now.perk * this.gapG;
-      const brkOut = (brk * now.clap + ride * now.hat) * this.gapG;
+      // tür davulu 4 kHz üstünde ~+5 dB: gerçek jungle ve gabber kayıtlarında tizin payı bizimkinin iki üç katıydı
+      const dr = brk * now.clap + ride * now.hat;
+      this.drLp += DR_A * (dr - this.drLp);
+      const brkOut = (dr + DR_TIZ * (dr - this.drLp)) * this.gapG;
       // oda: sönme süresi (RT60) 0,8 … 2,2 s, Oda ayarıyla uzar
       let wet = 0;
       if (now.room > 0.001) {

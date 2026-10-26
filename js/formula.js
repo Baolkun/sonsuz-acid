@@ -151,6 +151,7 @@ export function perkAt(sp, x) {
 // kalıp sayfaya tam oturur. Amen: The Winstons'ın "Amen, Brother"ındaki davul (1969). kik: türün kick'i (drive
 // doygunluk, decay sönüş, sweep başındaki perde katı ve st onun inişi; gabber'ın kick'i kırpılmış, uzun ve perdeli):
 // sesler yüklenene kadar davul formülden sentezlenir, sonra takımın sesleri çalar.
+// subG: sub-basın katı (gerçek jungle ve gabber kayıtlarında alt bizimkinden doluydu)
 // dogra: besteci yarım ölçüleri karıştırır; sert: cümle sonunda ve yükselişte roll (roll: hangi davulla); tempo: seçince
 // Amen'in ilk iki ölçüsü (ikisi aynı); kayıt da bu iki ölçü, sayfada iki kez döner
 const AMEN = 'K.K.S..s.sKKS..s'.repeat(4);
@@ -180,8 +181,8 @@ const groups = (bars, j) => bars.map((b) => b.map((n) => GRUP[n][j]).join('')).j
 const MATH = [[7, 5, 4], [7, 5, 4], [5, 5, 6], [3, 3, 3, 3, 4]];
 export const TURLER = {
   amen: { ad: 'Amen', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 0 },
-  jungle: { ad: 'jungle', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: true, sert: false, tempo: 165 },
-  core: { ad: 'breakcore', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 172 },
+  jungle: { ad: 'jungle', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: true, sert: false, tempo: 165, subG: 1.35 },
+  core: { ad: 'breakcore', A: AMEN, Q: RIDE, ses: REC, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 172, subG: 1.35 },
   dnb: {
     ad: 'drum & bass', A: 'K...S.....K.S...' + 'K...S..s..K.S..s' + 'K...S.....KKS...' + 'K...S..s.sK.S.s.',
     Q: 'h.h.h.o.h.h.h.h.'.repeat(4), ses: UZU, kik: KIK, roll: 'S', dogra: false, sert: false, tempo: 174,
@@ -196,7 +197,7 @@ export const TURLER = {
   },
   gabber: {
     ad: 'gabber', A: 'X...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K.K.',
-    Q: '..o.'.repeat(16), ses: SERT(6, 0.6), kik: { drive: 10, decay: 0.32, sweep: 5, st: 0.035, gain: 0.75 }, roll: 'K', dogra: false, sert: true, tempo: 190,
+    Q: '..o.'.repeat(16), ses: SERT(6, 0.6), kik: { drive: 10, decay: 0.32, sweep: 5, st: 0.035, gain: 0.75 }, roll: 'K', dogra: false, sert: true, tempo: 190, subG: 1.25,
   },
   french: {
     ad: 'frenchcore', A: 'X...K...K...K...' + 'K...Z...K...Z...' + 'K...K...K...K...' + 'K...Z...K..KZ.KK',
