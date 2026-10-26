@@ -3,13 +3,13 @@
 // sonraki sayfalar da oradan devam eder. "Kendi çeviriyor" açıkken acid ayarlarını eller çevirir (eller.js).
 // Ayarlar tarayıcıda saklanır.
 
-import { Besteci, PAGE, slideK } from './besteci.js?v=b81e02d5';
+import { Besteci, PAGE, slideK } from './besteci.js?v=d10b6fd1';
 import { Eller, KNOBS, RENKLER, TINILAR, seedEller } from './eller.js?v=2aa49873';
-import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=95ac14e5';
-import { Ses } from './ses.js?v=daf134b7';
-import { View } from './view.js?v=ba791f49';
-import { Kayit } from './kayit.js?v=66fe3342';
-import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=d016b217';
+import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=2f6cff6a';
+import { Ses } from './ses.js?v=8168ddbe';
+import { View } from './view.js?v=892100cc';
+import { Kayit } from './kayit.js?v=de826780';
+import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=641c2b14';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
@@ -57,8 +57,10 @@ function timeAt(beat) {
 const DJ_TEMPO = { amen: 165, techno: 140 };
 const djTempo = (tur) => TURLER[tur]?.tempo || DJ_TEMPO[tur ?? 'techno'];
 let rampAt = null; // tempo geçişinin kurulduğu sayfanın vuruşu
-// DJ seti: tür değişen sayfanın başından dört ölçü boyunca tempo yeni türünkine kayar (yumuşak), DJ'in pitch'i
-// itmesi gibi. Sayfa çalmaya başladıysa (yeni yolculuk elle) geçiş şimdiden başlar, yine dört ölçü sürer
+const DJ_RAMP = 2 * PAGE; // vuruş
+// DJ seti: tür değişen sayfanın başından sekiz ölçü boyunca tempo yeni türünkine kayar (yumuşak), DJ'in pitch'i
+// itmesi gibi. Tür kırılmada değişir: kayma davulsuz kırılmada ve yükselişte geçer. Sayfa çalmaya başladıysa (yeni
+// yolculuk elle) geçiş şimdiden başlar
 function djRamp(page, prev) {
   if (!besteci.settings.dj || !prev || page.tur === prev.tur || rampAt === page.beat) return;
   rampAt = page.beat;
@@ -66,8 +68,8 @@ function djRamp(page, prev) {
   const from = clocks.findLast((c) => c.beat <= b0)?.bpm ?? bpm;
   const to = djTempo(page.tur);
   if (from === to) return;
-  for (let b = b0; b <= b0 + PAGE; b++) {
-    const u = (b - b0) / PAGE;
+  for (let b = b0; b <= b0 + DJ_RAMP; b++) {
+    const u = (b - b0) / DJ_RAMP;
     addClock({ time: timeAt(b), beat: b, bpm: Math.round(10 * (from + (to - from) * (0.5 - 0.5 * Math.cos(Math.PI * u)))) / 10 });
   }
 }
@@ -592,7 +594,7 @@ function setTur(v) {
     showValue($('tempo'));
   }
   if (st.dj) {
-    liveEdit((s) => { s.tur = was; s.djN = 0; });
+    liveEdit((s) => { s.tur = was; s.djSw = false; });
     $('amen').querySelector('option[value="dj"]').textContent = t('DJ seti');
   }
 }

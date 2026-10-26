@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, TURLER, KIRIKLAR, mod } from './formula.js?v=95ac14e5';
+import { MODE_NAMES, TURLER, KIRIKLAR, mod } from './formula.js?v=2f6cff6a';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
@@ -94,7 +94,9 @@ export const DOGRAMALAR = [
   { sig: [0, 1, 2, 3, 4, 5, 6, 3], rho: [16, 16, 16, 16, 16, 16, 16, 8] },
   { sig: [0, 1, 4, 5, 0, 1, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] },
 ];
-// DJ seti: tür her yolculukta komşu bir türe geçer, DJ'lerin miksledikleri gibi (tempoları yakın, davulu akraba):
+// DJ seti: tür her yolculukta komşu bir türe geçer, DJ'lerin miksledikleri gibi (tempoları yakın, davulu akraba).
+// Geçiş kırılmada (davul yokken tempo kayar), yeni davul yükselişte eski melodinin altında gelir, ton ve melodi
+// drop'ta değişir: bir anda tek şey. Drop'ta hepsi birden değişince başka bir şarkıya geçilmiş gibi duyuluyordu.
 // techno'dan Amen'e, jungle'dan drum & bass'e, breakcore'dan speedcore'a, happy hardcore'dan gabber'a. null: tür yok (acid techno)
 export const DJ_YOL = {
   techno: ['amen', 'footwork', 'happy'],
@@ -110,7 +112,6 @@ export const DJ_YOL = {
   terror: ['gabber', 'speed', 'french'],
   speed: ['terror', 'core'],
 };
-export const DJ_TUR_YOLCULUK = 1; // tür kaç yolculukta bir değişir
 export const KIRIK_PAY = [0, 0, 1, 2, 3]; // KIRIKLAR: jungle ve breakcore'da yolculuğun break'i (Amen iki pay)
 export const AMEN_DUZ = { sig: [0, 1, 2, 3, 4, 5, 6, 7], rho: [16, 16, 16, 16, 16, 16, 16, 16] };
 export const RHO = [16, 8, 4, 2, 1];
@@ -196,7 +197,7 @@ export class Besteci {
       kalip: 'video', M: null, n: 5, p: 2, q: 32, acc: 2, bend: 4, slide: null, base: -18, c: 2, prog: [0, 0, 0, 0],
       fill: { u: 3, v: 6 }, hocket: { u: 3, v: 1, chirp: 0.4 }, kick: { at: 4, L: 4 }, lift: 6, riser: 3, blip: 0.25,
       hat: ['ara', 'onalti'], clap: 'geri', perk: ['shaker', 'rim'], enter: {}, roll: false, tema: null, geri: false,
-      amen: clone(AMEN_DUZ), son: false, glitch: [], tur: null, djN: 0, djEski: null, brk: 0,
+      amen: clone(AMEN_DUZ), son: false, glitch: [], tur: null, djSw: false, djEski: null, brk: 0,
     };
   }
 
@@ -301,23 +302,28 @@ export class Besteci {
     return Object.keys(KALIPLAR).filter((id) => id !== s.kalip && KALIPLAR[id].w && family(KALIPLAR[id], k));
   }
 
+  // DJ seti: komşu türe geçer; bir önceki türe dönmez (set ilerler)
+  djSwitch(changed) {
+    const { rng, s } = this;
+    const cur = s.tur ?? 'techno';
+    const yol = DJ_YOL[cur].filter((t) => t !== s.djEski);
+    const t = rng.pick(yol.length ? yol : DJ_YOL[cur]);
+    s.djEski = cur;
+    s.tur = t === 'techno' ? null : t;
+    s.djSw = true;
+    if (TURLER[s.tur]?.dogra) this.useDograma(s);
+    changed.add('amen');
+  }
+
   startJourney(changed) {
     const { rng, s, settings } = this;
     this.journey++;
     this.newWanted = false;
     this.at = 0;
     s.tema = null;
-    // DJ seti: tür her yolculukta komşusuna geçer (yeni yolculuk düşüşle başlar, geçiş orada)
-    if (settings.dj && this.journey > 1 && ++s.djN >= DJ_TUR_YOLCULUK) {
-      s.djN = 0;
-      // bir önceki türe dönmez (set ilerler)
-      const cur = s.tur ?? 'techno';
-      const yol = DJ_YOL[cur].filter((t) => t !== s.djEski);
-      const t = rng.pick(yol.length ? yol : DJ_YOL[cur]);
-      s.djEski = cur;
-      s.tur = t === 'techno' ? null : t;
-      changed.add('amen');
-    }
+    // DJ seti: kırılma olmadan biten yolculukta (elle yeni yolculuk, drop) tür burada değişir
+    if (settings.dj && this.journey > 1 && !s.djSw) this.djSwitch(changed);
+    s.djSw = false;
     if (TURLER[this.tur(s)]?.dogra) {
       this.useDograma(s);
       // her yolculuk başka bir break (ilki Amen; Amen'in payı iki kat, aynısı üst üste gelmez)
@@ -489,6 +495,7 @@ export class Besteci {
     const { rng, s, settings, prev } = this;
     const stage = this.plan[this.at];
     const eff = settings.stage ?? stage; // çalan bölüm
+    if (settings.dj && eff === 6 && !s.djSw) this.djSwitch(changed);
     const f = features(eff, settings.density);
     // aynı bölüm kaçıncı sayfadır çalıyor
     const run = !fresh && prev && prev.eff === eff ? prev.run + 1 : 1;

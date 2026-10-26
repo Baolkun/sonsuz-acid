@@ -151,7 +151,8 @@ export function perkAt(sp, x) {
 // kalıp sayfaya tam oturur. Amen: The Winstons'ın "Amen, Brother"ındaki davul (1969). kik: türün kick'i (drive
 // doygunluk, decay sönüş, sweep başındaki perde katı ve st onun inişi; gabber'ın kick'i kırpılmış, uzun ve perdeli):
 // sesler yüklenene kadar davul formülden sentezlenir, sonra takımın sesleri çalar.
-// subG: sub-basın katı (gerçek jungle ve gabber kayıtlarında alt bizimkinden doluydu)
+// subG: sub-basın katı (gerçek jungle ve gabber kayıtlarında alt bizimkinden doluydu; speedcore'da bas kick'te, sub
+// sekizlik kick'leri bulandırır)
 // dogra: besteci yarım ölçüleri karıştırır; sert: cümle sonunda ve yükselişte roll (roll: hangi davulla); tempo: seçince
 // Amen'in ilk iki ölçüsü (ikisi aynı); kayıt da bu iki ölçü, sayfada iki kez döner
 const AMEN = 'K.K.S..s.sKKS..s'.repeat(4);
@@ -169,9 +170,11 @@ const DILIM = [5.2, 102.6, 185.8, 279.5, 373.2, 469.3, 565.4, 632.2, 747.2, 834,
   1476.7, 1563.4, 1650.1, 1739, 1827.8, 1922.5, 2017.1, 2107.4, 2197.6, 2306.3, 2373.2, 2462.1, 2550.9, 2639.2, 2727.5, 2856];
 const REC = { ...UZU, brk: 'uzu/10_break_amen_pprocessed', bpm: 165, n: 32, dilim: DILIM };
 const SEKIZ = { kg: 0.75, K: '808/bd0050', S: '808/sd0050', C: '808/cp', h: '808/ch', o: '808/oh25', r: '808/cy0000', X: '808/cy0000' };
-const SERT = (bozuk, kg) => ({ ...UZU, K: 'uzu/10_bd_switchangel', S: 'uzu/12_sd_switchangel_2', bozuk, kg });
+// kf: kick örneğinin gövdesinin perdesi (Hz, ölçüldü). Sert türlerde kick bas gibi çalar: tonun köküne akort edilir
+// (sabit perdede ton değişince kick sub ve acid basla sürtüşüyordu, "hiçbir ses birbirine uymuyor")
+const SERT = (bozuk, kg) => ({ ...UZU, K: 'uzu/10_bd_switchangel', S: 'uzu/12_sd_switchangel_2', bozuk, kg, kf: 66 });
 // davul seslerinin dosyaları (ses.js yükler)
-export const SES_DOSYALARI = () => [...new Set([...Object.values(TURLER), ...KIRIKLAR].flatMap((T) => Object.entries(T.ses).filter(([k]) => !['bpm', 'n', 'bozuk', 'kg', 'dilim', 'son', 'g', 'kat'].includes(k)).map(([, v]) => v)))];
+export const SES_DOSYALARI = () => [...new Set([...Object.values(TURLER), ...KIRIKLAR].flatMap((T) => Object.entries(T.ses).filter(([k]) => !['bpm', 'n', 'bozuk', 'kg', 'dilim', 'son', 'g', 'kat', 'kf'].includes(k)).map(([, v]) => v)))];
 const KIK = { drive: 1.8, decay: 0.16, sweep: 3, st: 0.012, gain: 1.2 };
 // mathcore: yedi adımlık hücre (kick, snare, hayalet) ve beş adımda bir hat; 7'ye 5 dört ölçü boyunca kayar
 // mathcore: ölçü tek sayılı gruplara bölünür (7 + 5 + 4, 5 + 5 + 6, 3 + 3 + 3 + 3 + 4); her grup vurguyla açılır, her ölçü
@@ -193,7 +196,7 @@ export const TURLER = {
   },
   happy: {
     ad: 'happy hardcore', A: 'X...B...K...B...' + 'K...B...K...B...' + 'K...B...K...B...' + 'K...B...K...B.CC',
-    Q: 'h.o.'.repeat(16), ses: { ...UZU, K: 'uzu/14_bd_switchangel', bozuk: 1.5, kg: 0.6 }, kik: { drive: 4, decay: 0.2, sweep: 4, st: 0.02, gain: 0.9 }, roll: 'S', dogra: false, sert: true, tempo: 175,
+    Q: 'h.o.'.repeat(16), ses: { ...UZU, K: 'uzu/14_bd_switchangel', bozuk: 1.5, kg: 0.6, kf: 39 }, kik: { drive: 4, decay: 0.2, sweep: 4, st: 0.02, gain: 0.9 }, roll: 'S', dogra: false, sert: true, tempo: 175,
   },
   gabber: {
     ad: 'gabber', A: 'X...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K...' + 'K...K...K...K.K.',
@@ -209,7 +212,7 @@ export const TURLER = {
   },
   speed: {
     ad: 'speedcore', A: 'X.K.K.K.K.K.K.K.' + 'K.K.Z.K.K.K.Z.K.' + 'K.K.K.K.K.K.K.K.' + 'K.K.Z.K.KKKKKKKK',
-    Q: '.'.repeat(64), ses: SERT(7, 0.42), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220,
+    Q: '.'.repeat(64), ses: SERT(7, 0.42), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220, subG: 0.5,
   },
   math: {
     ad: 'mathcore', A: groups(MATH, 0), Q: groups(MATH, 1), ses: UZU, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,

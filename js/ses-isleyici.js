@@ -37,7 +37,7 @@
 // var, aynı kanalda yeni vuruş eskisini birkaç milisaniyede keser; Amen kaydı kalıbın her vuruşunda kaydın o on
 // altılığından başlar (tempoya göre hızlanır, jungle'daki gibi perdesi de kalkar), sonraki vuruşa kadar akar.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=95ac14e5';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=2f6cff6a';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -86,6 +86,13 @@ const CRASH_DECAY = 1.1; // s
 const SMP_GAIN = { K: 1.8, S: 1.5, C: 2.2, h: 1.2, o: 1.1, r: 0.9, X: 0.9, B: 2.1 }; // örneklerin düzeyi (tepe 1)
 const SMP_CUT = 0.003; // s: kesilen sesin sönüşü
 // brk: kuru (gerçek breakcore kayıtlarında break'in yankısı az; 0,35'te orta bölge bulanıyordu)
+// kick örneği tonun köküne: kökün kf'ye en yakın oktavı (±yarım oktav), hızla
+const kickRate = (sp, kf) => {
+  let f = REF_HZ * 2 ** (sp.base / 12);
+  while (f > kf * Math.SQRT2) f /= 2;
+  while (f < kf / Math.SQRT2) f *= 2;
+  return f / kf;
+};
 const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6, perk: 0.4, brk: 0.22 };
 const DR_A = 1 - Math.exp((-2 * Math.PI * 4000) / sampleRate); // tür davulunun parlatma süzgeci (4 kHz)
 const DR_TIZ = 0.8;
@@ -302,7 +309,7 @@ class FormulSes extends AudioWorkletProcessor {
   }
 
   // vuruşu türün örnekleriyle çalar; takımın sesleri yüklenmediyse false (sentez çalar)
-  sampled(h, bpm) {
+  sampled(h, bpm, sp) {
     const S = h.T.ses;
     const smp = this.smp;
     if (!S || !(S.brk ? smp[S.brk] : smp[S.K] && smp[S.S])) return false;
@@ -314,7 +321,7 @@ class FormulSes extends AudioWorkletProcessor {
       return true;
     }
     const ch = h.ch;
-    if ('KXBZ'.includes(ch)) this.play('K', smp[S.K], S.kg ?? 1, 1, 0, S.bozuk);
+    if ('KXBZ'.includes(ch)) this.play('K', smp[S.K], S.kg ?? 1, S.kf ? kickRate(sp, S.kf) : 1, 0, S.bozuk);
     if (ch === 'K' && h.vel < 1) this.vox.K.gain *= h.vel; // kick roll
     if ('SsZ'.includes(ch)) this.play('S', smp[S.S], h.vel, ch === 's' ? 1.06 : 1);
     if ('CB'.includes(ch)) this.play('C', smp[S.C], 1);
@@ -560,7 +567,7 @@ class FormulSes extends AudioWorkletProcessor {
         if (bt !== this.bt) {
           this.bt = bt;
           const h = breakAt(sp, x);
-          if (h && this.sampled(h, clock.bpm)) {
+          if (h && this.sampled(h, clock.bpm, sp)) {
             // pompa örnek kick'le de çalışır; sentez kick'i sessiz (kaydın kick'i yoksa o da vurur)
             if ('KXBZ'.includes(h.ch)) {
               this.bkAge = 0;
