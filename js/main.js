@@ -3,13 +3,13 @@
 // sonraki sayfalar da oradan devam eder. "Kendi çeviriyor" açıkken acid ayarlarını eller çevirir (eller.js).
 // Ayarlar tarayıcıda saklanır.
 
-import { Besteci, PAGE, slideK } from './besteci.js?v=448575f5';
+import { Besteci, PAGE, slideK } from './besteci.js?v=6d2c1abb';
 import { Eller, KNOBS, RENKLER, TINILAR, seedEller } from './eller.js?v=2aa49873';
 import { renderFormula, MODE_NAMES, TURLER, mod } from './formula.js?v=cbd8f3e6';
 import { Ses } from './ses.js?v=e4e66be4';
-import { View } from './view.js?v=2e751520';
-import { Kayit } from './kayit.js?v=d136ad0c';
-import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=bc423345';
+import { View } from './view.js?v=fc26287b';
+import { Kayit } from './kayit.js?v=1f36ff14';
+import { t, word, setLang, infoLine, pageName, lang } from './dil.js?v=c99e5e88';
 
 const LEAD = 6; // vuruş: sıradaki sayfa en geç bu kadar önceden yazılıp ses işçisine gider
 const STORE = 'sonsuz-acid-ayarlar';
@@ -608,6 +608,11 @@ $('amen').addEventListener('change', () => {
     showValue($('tempo'));
   }
 });
+// break seçilince çalan sayfa hemen o kayıtla yeniden yazılır (boşsa yolculuk seçer)
+$('brk').addEventListener('change', () => {
+  besteci.settings.brk = $('brk').value === '' ? null : num('brk');
+  liveEdit(() => {}, ['amen']);
+});
 // şarkı seçilince çalan sayfa hemen o melodiyle yeniden yazılır
 $('sarki').addEventListener('change', () => {
   besteci.settings.sarki = $('sarki').value || null;
@@ -747,6 +752,7 @@ st.change = num('degisim') / 100;
 st.glitch = num('glitch') / 100;
 st.key = $('ton').value === '' ? null : num('ton');
 st.kick = $('desen').value || null;
+st.brk = $('brk').value === '' ? null : num('brk');
 st.hat = $('hatDesen').value || null;
 st.clap = $('clapDesen').value || null;
 st.perk = $('perkDesen').value || null;

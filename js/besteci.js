@@ -181,7 +181,7 @@ export class Besteci {
   constructor(seed) {
     this.rng = createRng(seed);
     // kullanıcının ayarları; stage, kick ve key null ise besteci kendisi seçer
-    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null, amen: null, glitch: 0.4, dj: false };
+    this.settings = { mood: 0.35, density: 0.6, change: 0.4, F: 7, slide: 50, stage: null, kick: null, key: null, kalip: null, hat: null, clap: null, perk: null, sarki: null, amen: null, glitch: 0.4, dj: false, brk: null };
     this.locked = false;
     this.newWanted = false;
     this.wantRoll = false; // elle istenen dolgu: sonraki sayfada
@@ -444,7 +444,7 @@ export class Besteci {
     const tur = this.tur(s);
     if (tur && kick) {
       const T = TURLER[tur];
-      const a = { ...clone(T.dogra && s.drop ? AMEN_DUZ : s.amen), tur, brk: T.dogra ? s.brk ?? 0 : null };
+      const a = { ...clone(T.dogra && s.drop ? AMEN_DUZ : s.amen), tur, brk: T.ses.brk ? this.settings.brk ?? (T.dogra ? s.brk ?? 0 : 0) : null };
       if (s.gap) a.rho = T.sert ? [16, 16, 16, 16, 8, 4, 2, 1] : [16, 16, 16, 16, 16, 16, 8, 4];
       else if (s.roll || s.son) {
         a.rho[7] = T.sert ? 1 : 8;
