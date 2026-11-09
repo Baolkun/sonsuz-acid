@@ -9,7 +9,7 @@
 // yeniden yazılır, sonraki sayfalar da oradan devam eder. Kilitliyken aynı sayfa tekrar eder.
 
 import { createRng } from './rng.js?v=baee4ba4';
-import { MODE_NAMES, TURLER, KIRIKLAR, mod } from './formula.js?v=2f6cff6a';
+import { MODE_NAMES, TURLER, KIRIKLAR, mod } from './formula.js?v=54f215be';
 
 export const PAGE = 16; // vuruş
 // yedinci bölüm kırılma (breakdown): kick ve clap susar, filtre kapanır; ardından yükseliş (altı) ve drop (beş, her şey
@@ -19,7 +19,8 @@ export const NAMES = ['bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'kırılma
 const ENDING = [6, 5, 4, 4];
 const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 // akor kökleri, dizide basamak olarak; her ölçüye bir tane. Hepsi −2 … 4 arasında, bas tonikten fazla uzaklaşmaz
-const PROGS = [[0, 0, -2, -2], [0, -2, 2, -1], [0, -1, -2, -1], [0, 0, 3, 4], [0, -2, -1, 0], [0, 3, -2, 4], [0, 0, 0, 0]];
+const PROGS = [[0, 0, -2, -2], [0, -2, 2, -1], [0, -1, -2, -1], [0, 0, 3, 4], [0, -2, -1, 0], [0, 3, -2, 4], [0, 0, 0, 0],
+  [0, 2, -1, 0], [0, -2, -2, 3], [0, 1, 0, -2]];
 // Ritim kalıpları. n desenin boyu, M kaç adımda bir baştan başladığı (8: yarım ölçü, 16: ölçü), p başlangıcı; vurgu
 // adımı 0, hoket varken de bas katında kalır. Aynı n ve M'deki kalıplar kardeş: çeşitlemede birinden ötekine geçilir,
 // vurgu ölçüde başka yere oturur. w: yeni yolculukta seçilme ağırlığı; videodaki kendiliğinden seçilmez
@@ -33,6 +34,12 @@ export const KALIPLAR = {
   altili: { ad: '6+6+4', n: 6, M: 16, p: 0, w: 2 },
   besuc: { ad: '5+3', n: 5, M: 8, p: 0, w: 2 },
   yedili: { ad: '7+7+2', n: 7, M: 16, p: 0, w: 1 },
+  // uzun dinlemede tekrar sezilmesin diye eklenenler: kardeşler (aynı n, M) ve iki yeni aile
+  besucKay: { ad: '5+3 kaymış', n: 5, M: 8, p: 2, w: 1 },
+  ucluKay: { ad: 'üçlü kaymış', n: 3, M: 16, p: 2, w: 1 },
+  yediliKay: { ad: '7+7+2 kaymış', n: 7, M: 16, p: 3, w: 1 },
+  besli: { ad: '5+5+6', n: 5, M: 16, p: 0, w: 2 },
+  altiiki: { ad: '6+2', n: 6, M: 8, p: 0, w: 1 },
   video: { ad: 'videodaki', n: 5, M: null, p: 2, acc: 2, bend: 4, w: 0 },
 };
 const family = (a, b) => a.n === b.n && a.M === b.M;
@@ -439,6 +446,7 @@ export class Besteci {
       clap: C ? { beats: C.beats.slice(), son: C.son, from: enter('clap') } : null,
       perk: P ? { ses: P.ses, m: P.m, on: P.on.slice(), from: enter('perk') } : null,
       gap: !!s.gap,
+      swap: !!s.swap,
       glitch: st.glitch && s.glitch?.length ? clone(s.glitch) : null,
       // Shepard: yükselişte yükselir, kırılmada iner
       shep: stage === 5 ? 1 : stage === 6 ? -1 : null,
@@ -456,6 +464,7 @@ export class Besteci {
         a.rho[7] = T.sert ? 1 : 8;
         if (T.sert) a.rho[6] = 8;
       }
+      if (T.yari) sp.yari = { h: half };
       Object.assign(sp, { amen: a, kick: null, clap: st.clap ? sp.clap : null, hat: st.hat ? sp.hat : null, perk: st.perk ? sp.perk : null });
     }
     // şarkı: melodi notaları listeden okur; bas satırının kalıbı, dolgusu, hoketi, kayması susar, akorlar şarkınınki
@@ -510,6 +519,8 @@ export class Besteci {
     // drop: yükselişten sonra beşinci bölüm; yükselişin son yarım vuruşu sessiz kalır (drop öncesi boşluk)
     s.drop = settings.stage === null && !fresh && prev?.eff === 5 && eff === 4;
     s.gap = settings.stage === null && eff === 5 && after === 4;
+    // DJ bas takası: yolculuğun son sayfasında eski basın altı kısılır, yeni tonun basi sonra açılarak girer
+    s.swap = !!settings.dj && settings.stage === null && after === undefined;
     s.glitch = this.glitchPlan(s);
     // yeni giren hat ya da clap sayfanın ikinci yarısında başlar
     s.enter = {

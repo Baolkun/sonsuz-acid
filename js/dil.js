@@ -109,6 +109,7 @@ export const EN = {
   'vuruş öncesi': 'before the beat',
   'vuruş sonrası': 'after the beat',
   'üçlü (ölçü boyu)': 'threes (across the bar)',
+  '5+3 kaymış': '5+3 shifted', 'üçlü kaymış': 'threes shifted', '7+7+2 kaymış': '7+7+2 shifted',
   'videodaki (kayan)': 'original (shifting)',
   'Kick deseni': 'Kick pattern',
   'bölüme göre': 'by section',
@@ -168,7 +169,7 @@ export const EN = {
 const WORDS = {
   bir: 'one', iki: 'two', üç: 'three', dört: 'four', beş: 'five', altı: 'six', kırılma: 'break', drop: 'drop', 'tema geri': 'theme returns',
   lokryen: 'Locrian', frigyen: 'Phrygian', eolyen: 'Aeolian', doryen: 'Dorian', miksolidyen: 'Mixolydian', iyonyen: 'Ionian', lidyen: 'Lydian',
-  'ara vuruş': 'offbeat', 'vuruş öncesi': 'before the beat', 'vuruş sonrası': 'after the beat', üçlü: 'threes', videodaki: 'original',
+  'ara vuruş': 'offbeat', 'vuruş öncesi': 'before the beat', 'vuruş sonrası': 'after the beat', üçlü: 'threes', videodaki: 'original', '5+3 kaymış': '5+3 shifted', 'üçlü kaymış': 'threes shifted', '7+7+2 kaymış': '7+7+2 shifted',
   kuru: 'dry', derin: 'deep', parlak: 'bright', sıkı: 'tight', geniş: 'wide',
   kesik: 'clipped', karışık: 'mixed', kayan: 'sliding', oyuk: 'hollow', testere: 'saw', kare: 'square',
 };

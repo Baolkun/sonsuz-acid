@@ -37,7 +37,7 @@
 // var, aynı kanalda yeni vuruş eskisini birkaç milisaniyede keser; Amen kaydı kalıbın her vuruşunda kaydın o on
 // altılığından başlar (tempoya göre hızlanır, jungle'daki gibi perdesi de kalkar), sonraki vuruşa kadar akar.
 
-import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=2f6cff6a';
+import { kickY, melodyY, accentAt, hatAt, hatY, clapAt, clapY, padY, perkAt, perkY, breakAt, drumHz, subHz, shepAt, SHEP, HAT_Y, CLAP_Y, REF_HZ, KICK_HZ, TURLER } from './formula.js?v=54f215be';
 
 const PAGE = 16; // vuruş
 const TAU = 2 * Math.PI;
@@ -96,6 +96,10 @@ const kickRate = (sp, kf) => {
 const ROOM_SEND = { mel: 0.12, hat: 0.3, clap: 0.7, pad: 0.6, perk: 0.4, brk: 0.22 };
 const DR_A = 1 - Math.exp((-2 * Math.PI * 4000) / sampleRate); // tür davulunun parlatma süzgeci (4 kHz)
 const DR_TIZ = 0.8;
+// acid basın ortası (300 Hz–2,5 kHz) gerçek kayıtlara göre ~2 kat fazlaydı: o bant 0,7'ye (-3 dB) iner, kutu sesi gitsin
+const MO_A = 1 - Math.exp((-2 * Math.PI * 300) / sampleRate);
+const MO_B = 1 - Math.exp((-2 * Math.PI * 2500) / sampleRate);
+const MEL_ORTA = 0.7;
 const ROOM_HP = 250; // Hz: yankıya giden sesin altı kesilir
 const ROOM_DAMP = 5000; // Hz: hatların içinde tizi koyulaştırır
 const ROOM_OUT = 0.6;
@@ -217,6 +221,9 @@ class FormulSes extends AudioWorkletProcessor {
     this.snHp = 0;
     this.snLp = 0;
     this.drLp = 0;
+    this.moA = 0;
+    this.moB = 0;
+    this.basG = 1; // DJ bas takası: sub ve acid'in 300 Hz altı
     this.subG = 1;
     this.subGs = 1; // yumuşatılmış (sayfa sınırında tık olmasın)
     this.rdAge = 1;
@@ -452,8 +459,12 @@ class FormulSes extends AudioWorkletProcessor {
       if (page) {
         const { sp } = page;
         const x = beat - page.beat - 8;
-        this.subT = subHz(sp, x);
+        // yarı hız (speedcore): melodi, akor ve sub iki sayfaya yayılır; davul hızlı kalır, üstü uzun notalar
+        const xm = sp.yari ? (x + 8) / 2 - 8 + 8 * sp.yari.h : x;
+        this.subT = subHz(sp, xm);
         this.subG = (sp.amen && TURLER[sp.amen.tur]?.subG) || 1;
+        // takas sayfasında boyunca doğrusal iner; sonra ~4 saniyede geri açılır
+        this.basG = sp.swap ? Math.min(this.basG, Math.max(0, 1 - (x + 8) / PAGE)) : Math.min(1, this.basG + 1 / (4 * sr));
         sh = shepAt(sp, x);
         if (sp.glitch) {
           for (const g of sp.glitch) if (x >= g.x && x < g.x + g.d) gEv = g;
@@ -469,20 +480,20 @@ class FormulSes extends AudioWorkletProcessor {
         if (sp.pad) {
           padT = sp.pad.lvl;
           for (let k = 0; k < 3; k++) {
-            const hz = REF_HZ * 2 ** padY(sp, x, k);
+            const hz = REF_HZ * 2 ** padY(sp, xm, k);
             this.pHz[k] = this.pHz[k] ? this.pHz[k] + (hz - this.pHz[k]) * this.pGlide : hz;
           }
         }
         if (sp.gap && x >= 7.5) gapT = 0; // drop öncesi boşluk: son yarım vuruş sessiz, yalnızca oda yankısı kalır
 
         // melodi: perde sıçrayınca yeni nota; vurgulu adıma girince perde aynı kalsa da nota yeniden vurulur (303'teki gibi)
-        const y = melodyY(sp, x);
-        const st = Math.floor(4 * beat);
+        const y = melodyY(sp, xm);
+        const st = Math.floor((sp.yari ? 2 : 4) * beat);
         const stepIn = st !== this.st;
         this.st = st;
-        if (this.raw === null || Math.abs(y - this.raw) > JUMP || (stepIn && accentAt(sp, x))) {
+        if (this.raw === null || Math.abs(y - this.raw) > JUMP || (stepIn && accentAt(sp, xm))) {
           this.age = 0;
-          this.acc = accentAt(sp, x) ? prm.accent : 0;
+          this.acc = accentAt(sp, xm) ? prm.accent : 0;
           if (this.acc) this.sweepT = Math.min(SWEEP_MAX, this.sweepT + SWEEP * this.acc);
         }
         this.raw = y;
@@ -854,7 +865,7 @@ class FormulSes extends AudioWorkletProcessor {
         if (this.subPh >= 1) this.subPh -= 1;
         const env = SUB_HOLD + (1 - SUB_HOLD) * Math.exp(-this.age / SUB_DECAY);
         const subDuck = 1 - Math.min(1, 0.4 + now.pump) * 0.95 * Math.exp(-kA / 0.13) * (1 - Math.exp(-kA / 0.004));
-        subOut = Math.sin(TAU * this.subPh) * env * now.sub * subDuck * this.gapG * (this.subGs += 0.0005 * (this.subG - this.subGs));
+        subOut = Math.sin(TAU * this.subPh) * env * now.sub * subDuck * this.gapG * this.basG * (this.subGs += 0.0005 * (this.subG - this.subGs));
       }
       // Shepard: frac p sıfırdan geçince sinüsler bir basamak kayar (en tizdeki duyulmazken en pese döner)
       let shOut = 0;
@@ -874,7 +885,9 @@ class FormulSes extends AudioWorkletProcessor {
         }
         shOut = (s / (SHEP.SIG * 2.5066)) * this.shA * now.shep * duck * this.gapG;
       }
-      const melOut = mel * MEL * comp * duck * this.gapG;
+      this.moA += MO_A * (mel - this.moA);
+      this.moB += MO_B * (mel - this.moB);
+      const melOut = (mel - (1 - MEL_ORTA) * (this.moB - this.moA) - (1 - this.basG) * this.moA) * MEL * comp * duck * this.gapG;
       const hatOut = hat * now.hat * this.gapG;
       const clapOut = clap * now.clap * this.gapG;
       const perkOut = perk * now.perk * this.gapG;

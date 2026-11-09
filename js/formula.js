@@ -212,7 +212,7 @@ export const TURLER = {
   },
   speed: {
     ad: 'speedcore', A: 'X.K.K.K.K.K.K.K.' + 'K.K.Z.K.K.K.Z.K.' + 'K.K.K.K.K.K.K.K.' + 'K.K.Z.K.KKKKKKKK',
-    Q: '.'.repeat(64), ses: SERT(7, 0.42), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220, subG: 0.5,
+    Q: '.'.repeat(64), ses: SERT(7, 0.42), kik: { drive: 12, decay: 0.1, sweep: 5, st: 0.015, gain: 0.7 }, roll: 'K', dogra: false, sert: true, tempo: 220, subG: 0.5, yari: true,
   },
   math: {
     ad: 'mathcore', A: groups(MATH, 0), Q: groups(MATH, 1), ses: UZU, kik: KIK, roll: 'S', dogra: true, sert: true, tempo: 160,
